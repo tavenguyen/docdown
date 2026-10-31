@@ -1,13 +1,13 @@
 (function () {
   'use strict';
 
-  const SH = globalThis.DocDown;
-  if (!SH) return;
+  const DD = globalThis.DocDown;
+  if (!DD) return;
 
   const ui = {};
-  SH.ui = ui;
+  DD.ui = ui;
 
-  const IDs = {
+  const IDS = {
     stack: 'docdown-fab-stack',
     button: 'docdown-download-button',
     reset: 'docdown-reset-button',
@@ -19,11 +19,12 @@
 
   const RESET_LABEL = 'Reset phiên';
   const RESET_LABEL_ARMED = 'Xoá tất cả?';
-  const RESET_HINT = 'Xoá cookie, cache và dữ liệu trang Studocu (đăng xuất tài khoản)';
-  const RESET_HINT_ARMED = 'Bấm lần nữa để xoá cookie, cache và đăng xuất khỏi Studocu';
+  const RESET_HINT = 'Xoá cookie, cache và dữ liệu trang (đăng xuất tài khoản)';
+  const RESET_HINT_ARMED = 'Bấm lần nữa để xoá cookie, cache và đăng xuất';
   const RESET_ARM_MS = 3000;
 
   const state = {
+    provider: null,
     toastTimer: 0,
     panelTimer: 0,
     resetTimer: 0,
@@ -31,31 +32,35 @@
   };
 
   function getStack() {
-    return document.getElementById(IDs.stack);
+    return document.getElementById(IDS.stack);
   }
 
   function getButton() {
-    return document.getElementById(IDs.button);
+    return document.getElementById(IDS.button);
   }
 
   function getResetButton() {
-    return document.getElementById(IDs.reset);
+    return document.getElementById(IDS.reset);
   }
 
   function getPanel() {
-    return document.getElementById(IDs.panel);
+    return document.getElementById(IDS.panel);
+  }
+
+  function actionLabel() {
+    return (state.provider && state.provider.actionLabel) || 'Tải PDF';
   }
 
   function createStack() {
     const stack = document.createElement('div');
-    stack.id = IDs.stack;
+    stack.id = IDS.stack;
     stack.className = 'docdown-fab-stack';
     return stack;
   }
 
   function createButton() {
     const button = document.createElement('button');
-    button.id = IDs.button;
+    button.id = IDS.button;
     button.type = 'button';
     button.className = 'docdown-fab';
     button.setAttribute('data-docdown-button', 'download');
@@ -64,13 +69,12 @@
       '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
       '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" ' +
       'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '</svg><span class="docdown-label">Tải PDF</span>';
+      '</svg><span class="docdown-label">' + actionLabel() + '</span>';
     button.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
-      if (SH.download && typeof SH.download.start === 'function') {
-        SH.download.start();
-      }
+      const provider = state.provider;
+      if (provider && typeof provider.run === 'function') provider.run();
     });
     button.addEventListener('mousedown', function (event) {
       event.stopPropagation();
@@ -111,7 +115,7 @@
     const button = getResetButton();
     if (button) button.disabled = true;
 
-    const result = await SH.requestFullReset().catch(function () { return null; });
+    const result = await DD.requestFullReset().catch(function () { return null; });
 
     if (!result || !result.supported) {
       if (button) button.disabled = false;
@@ -135,7 +139,7 @@
 
   function createResetButton() {
     const button = document.createElement('button');
-    button.id = IDs.reset;
+    button.id = IDS.reset;
     button.type = 'button';
     button.className = 'docdown-fab docdown-fab-reset';
     button.setAttribute('data-docdown-button', 'reset');
@@ -162,7 +166,7 @@
 
   function createPanel() {
     const panel = document.createElement('div');
-    panel.id = IDs.panel;
+    panel.id = IDS.panel;
     panel.className = 'docdown-panel';
     panel.setAttribute('role', 'status');
     panel.setAttribute('aria-live', 'polite');
@@ -170,12 +174,12 @@
 
     const text = document.createElement('div');
     text.className = 'docdown-panel-text';
-    text.id = IDs.panelText;
+    text.id = IDS.panelText;
 
     const track = document.createElement('div');
     track.className = 'docdown-progress';
     const bar = document.createElement('i');
-    bar.id = IDs.progress;
+    bar.id = IDS.progress;
     track.appendChild(bar);
 
     panel.appendChild(text);
@@ -183,8 +187,12 @@
     return panel;
   }
 
-  ui.mount = function () {
-    if (!SH.isDocumentPage()) return;
+  // Mounts the floating buttons for a provider. Called again on viewer
+  // mutations, so it must stay idempotent.
+  ui.mount = function (provider) {
+    if (provider) state.provider = provider;
+    const active = state.provider;
+    if (!active || (typeof active.isDocumentPage === 'function' && !active.isDocumentPage())) return;
     if (!document.body) return;
     let stack = getStack();
     if (!stack) {
@@ -194,8 +202,12 @@
     let button = getButton();
     if (!button) {
       button = stack.appendChild(createButton());
-    } else if (button.parentNode !== stack) {
-      stack.appendChild(button);
+    } else {
+      if (button.parentNode !== stack) stack.appendChild(button);
+      const label = button.querySelector('.docdown-label');
+      if (label && !button.disabled && label.textContent !== actionLabel()) {
+        label.textContent = actionLabel();
+      }
     }
     if (!getResetButton()) stack.insertBefore(createResetButton(), button);
     if (!getPanel()) document.body.appendChild(createPanel());
@@ -216,16 +228,16 @@
     if (nextState === 'working') {
       button.disabled = true;
       if (resetButton) resetButton.disabled = true;
-      if (label) label.textContent = 'Đang quét…';
+      if (label) label.textContent = (state.provider && state.provider.busyLabel) || 'Đang quét…';
       panel.classList.remove('docdown-panel-error', 'docdown-panel-ready');
     } else if (nextState === 'ready') {
-      if (label) label.textContent = 'Tải lại PDF';
+      if (label) label.textContent = actionLabel();
       panel.classList.add('docdown-panel-ready');
     } else if (nextState === 'error') {
       if (label) label.textContent = 'Thử lại';
       panel.classList.add('docdown-panel-error');
     } else {
-      if (label) label.textContent = 'Tải PDF';
+      if (label) label.textContent = actionLabel();
       panel.hidden = true;
     }
 
@@ -233,13 +245,13 @@
   };
 
   ui.progressText = function (message) {
-    const text = document.getElementById(IDs.panelText);
+    const text = document.getElementById(IDS.panelText);
     if (text) text.textContent = message;
   };
 
   ui.progress = function (done, total, message) {
     const panel = getPanel();
-    const bar = document.getElementById(IDs.progress);
+    const bar = document.getElementById(IDS.progress);
     if (!panel || !bar) return;
     panel.hidden = false;
     const safeTotal = Math.max(1, Number(total) || 1);
@@ -249,10 +261,10 @@
   };
 
   ui.toast = function (message, type) {
-    let toast = document.getElementById(IDs.toast);
+    let toast = document.getElementById(IDS.toast);
     if (!toast) {
       toast = document.createElement('div');
-      toast.id = IDs.toast;
+      toast.id = IDS.toast;
       toast.setAttribute('role', 'alert');
       document.body.appendChild(toast);
     }
@@ -294,8 +306,8 @@
     }
   };
 
-  // The preview is an extension page, so it is cross-origin to the Studocu tab
-  // and receives the document through postMessage.
+  // The preview is an extension page, so it is cross-origin to the document
+  // tab and receives the document through postMessage.
   ui.deliverPrintDocument = function (win, html, fileName) {
     return new Promise(function (resolve) {
       if (!win || win.closed) {
@@ -384,7 +396,7 @@
     const button = getButton();
     const resetButton = getResetButton();
     const panel = getPanel();
-    const toast = document.getElementById(IDs.toast);
+    const toast = document.getElementById(IDS.toast);
     if (stack) stack.remove();
     if (button) button.remove();
     if (resetButton) resetButton.remove();

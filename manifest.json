@@ -43,10 +43,13 @@
         "https://*.studeersnel.nl/*"
       ],
       "js": [
-        "content/core.js",
+        "lib/core.js",
+        "lib/sanitize.js",
+        "lib/render.js",
+        "lib/registry.js",
+        "providers/studocu.js",
         "content/ui.js",
-        "content/pages.js",
-        "content/download.js"
+        "content/main.js"
       ],
       "css": ["style.css"],
       "run_at": "document_idle"

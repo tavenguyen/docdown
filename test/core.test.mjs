@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const coreSource = fs.readFileSync(new URL('../content/core.js', import.meta.url), 'utf8');
+const APP_SOURCES = [
+  '../lib/core.js',
+  '../lib/sanitize.js',
+  '../lib/render.js',
+  '../lib/registry.js',
+  '../providers/studocu.js'
+].map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 
 function loadCore(overrides) {
   const context = {
@@ -30,7 +36,9 @@ function loadCore(overrides) {
   };
   Object.assign(context, overrides || {});
   vm.createContext(context);
-  vm.runInContext(coreSource, context, { filename: 'core.js' });
+  APP_SOURCES.forEach((source, index) => {
+    vm.runInContext(source, context, { filename: 'app' + index + '.js' });
+  });
   return context.DocDown;
 }
 
@@ -66,7 +74,7 @@ test('parseDocumentMeta reads page count, object key and wrapper classes', () =>
     ]
   };
 
-  const meta = SH.parseDocumentMeta(props, { title: 'fallback', pageCount: 2 });
+  const meta = SH.providerById('studocu').parseDocumentMeta(props, { title: 'fallback', pageCount: 2 });
   assert.equal(meta.pageCount, 2);
   assert.equal(meta.objectKey, 'abc123');
   assert.equal(meta.baseUrl, 'https://doc-assets.studocu.com/abc123/html/');
@@ -77,7 +85,7 @@ test('parseDocumentMeta reads page count, object key and wrapper classes', () =>
 });
 
 test('parseDocumentMeta rejects unsafe object keys', () => {
-  const meta = SH.parseDocumentMeta({
+  const meta = SH.providerById('studocu').parseDocumentMeta({
     document: { numberOfPages: 1 },
     documentAccess: { objectKey: '../evil', signedQueryParams: { global: '?sig=1' } }
   }, { pageCount: 1 });
@@ -92,7 +100,7 @@ test('buildUrls uses hex backgrounds and decimal text pages', () => {
     signedParams: { global: '?sig=1' },
     pageParams: {}
   };
-  const urls = SH.buildUrls(meta, 10);
+  const urls = SH.providerById('studocu').buildUrls(meta, 10);
   const base = 'https://doc-assets.studocu.com/abc123/html/';
   assert.equal(urls.bgUrl, base + 'bga.png?sig=1');
   assert.equal(urls.textUrl, base + 'abc12310.page?sig=1');
@@ -107,19 +115,19 @@ test('per-page signed params override global text params', () => {
     signedParams: { global: '?g=1', png: '?png=1', css: '?css=1', blurredPage: '?blur=1' },
     pageParams: { 1: '?page=1' }
   };
-  assert.match(SH.buildUrls(meta, 1).textUrl, /\?page=1$/);
-  assert.match(SH.buildUrls(meta, 2).textUrl, /\?g=1$/);
-  assert.match(SH.buildUrls(meta, 1).bgUrl, /\?png=1$/);
-  assert.match(SH.buildUrls(meta, 1).clearPageUrl, /\?g=1$/);
+  assert.match(SH.providerById('studocu').buildUrls(meta, 1).textUrl, /\?page=1$/);
+  assert.match(SH.providerById('studocu').buildUrls(meta, 2).textUrl, /\?g=1$/);
+  assert.match(SH.providerById('studocu').buildUrls(meta, 1).bgUrl, /\?png=1$/);
+  assert.match(SH.providerById('studocu').buildUrls(meta, 1).clearPageUrl, /\?g=1$/);
 });
 
 test('isAllowedAssetUrl only accepts Studocu asset hosts over HTTPS', () => {
-  assert.equal(SH.isAllowedAssetUrl('https://doc-assets.studocu.com/a/b.png'), true);
-  assert.equal(SH.isAllowedAssetUrl('https://website-assets.studocu.com/fonts/a.woff'), true);
-  assert.equal(SH.isAllowedAssetUrl('https://doc-assets.studocu.com.evil.test/a.png'), false);
-  assert.equal(SH.isAllowedAssetUrl('http://doc-assets.studocu.com/a.png'), false);
-  assert.equal(SH.isAllowedAssetUrl('https://evil.test/a.png'), false);
-  assert.equal(SH.isAllowedAssetUrl('javascript:alert(1)'), false);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('https://doc-assets.studocu.com/a/b.png'), true);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('https://website-assets.studocu.com/fonts/a.woff'), true);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('https://doc-assets.studocu.com.evil.test/a.png'), false);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('http://doc-assets.studocu.com/a.png'), false);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('https://evil.test/a.png'), false);
+  assert.equal(SH.providerById('studocu').isAllowedAssetUrl('javascript:alert(1)'), false);
 });
 
 test('escapeHtml escapes attribute-sensitive characters', () => {

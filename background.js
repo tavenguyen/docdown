@@ -1,13 +1,9 @@
-importScripts('content/core.js');
+importScripts('lib/core.js', 'lib/registry.js', 'providers/studocu.js');
 
-const SH = globalThis.DocDown;
-if (!SH) throw new Error('DocDown core did not load');
+const DD = globalThis.DocDown;
+if (!DD) throw new Error('DocDown core did not load');
 
 const RESET_MESSAGE = 'docdown-reset';
-const ASSET_ORIGINS = [
-  'https://doc-assets.studocu.com',
-  'https://website-assets.studocu.com'
-];
 const SITE_DATA = {
   cache: true,
   cacheStorage: true,
@@ -35,7 +31,7 @@ function cookieUrl(cookie) {
 
 function buildSiteOrigins(hostname) {
   const origins = [];
-  SH.parentDomains(hostname).forEach(function (domain) {
+  DD.parentDomains(hostname).forEach(function (domain) {
     const apex = domain.replace(/^\./, '');
     origins.push('https://' + apex);
     origins.push('https://www.' + apex);
@@ -113,7 +109,7 @@ async function clearBrowsingData(siteOrigins) {
   }
 
   try {
-    await chrome.browsingData.remove({ origins: ASSET_ORIGINS }, ASSET_DATA);
+    await chrome.browsingData.remove({ origins: DD.assetOrigins() }, ASSET_DATA);
   } catch (error) {
     // Asset cache is best effort and never blocks the cookie reset.
   }
@@ -127,10 +123,10 @@ async function handleReset(message, sender) {
   }
 
   const hostname = String(message.hostname || '').toLowerCase();
-  if (!hostname || !SH.isSupportedHost(hostname)) return { ok: false, error: 'host' };
+  if (!hostname || !DD.isSupportedHost(hostname)) return { ok: false, error: 'host' };
 
   const stores = await getStores(sender);
-  const domains = SH.parentDomains(hostname).map(function (domain) {
+  const domains = DD.parentDomains(hostname).map(function (domain) {
     return domain.replace(/^\./, '');
   });
 

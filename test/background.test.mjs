@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const coreSource = fs.readFileSync(new URL('../content/core.js', import.meta.url), 'utf8');
+const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js']
+  .map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 const backgroundSource = fs.readFileSync(new URL('../background.js', import.meta.url), 'utf8');
 
 function loadBackground(options) {
@@ -75,7 +76,9 @@ function loadBackground(options) {
     Promise
   };
   vm.createContext(context);
-  vm.runInContext(coreSource, context, { filename: 'core.js' });
+  APP_SOURCES.forEach((source, index) => {
+    vm.runInContext(source, context, { filename: 'app' + index + '.js' });
+  });
   vm.runInContext(backgroundSource, context, { filename: 'background.js' });
 
   function send(message, sender) {

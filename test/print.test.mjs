@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const coreSource = fs.readFileSync(new URL('../content/core.js', import.meta.url), 'utf8');
+const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js']
+  .map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 const printSource = fs.readFileSync(new URL('../print.js', import.meta.url), 'utf8');
 
 function createPrintContext() {
@@ -86,7 +87,9 @@ function createPrintContext() {
   context.globalThis = context;
 
   vm.createContext(context);
-  vm.runInContext(coreSource, context, { filename: 'core.js' });
+  APP_SOURCES.forEach((source, index) => {
+    vm.runInContext(source, context, { filename: 'app' + index + '.js' });
+  });
   vm.runInContext(printSource, context, { filename: 'print.js' });
 
   function deliver(origin, data) {
