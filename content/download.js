@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const SH = globalThis.StudocuDown;
+  const SH = globalThis.DocDown;
   if (!SH) return;
 
   const download = {};

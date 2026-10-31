@@ -31,7 +31,7 @@ function loadCore(overrides) {
   Object.assign(context, overrides || {});
   vm.createContext(context);
   vm.runInContext(coreSource, context, { filename: 'core.js' });
-  return context.StudocuDown;
+  return context.DocDown;
 }
 
 function createCookieDocument(initialCookie) {
@@ -145,7 +145,7 @@ test('buildPagesHtml labels gated and missing pages', () => {
   assert.match(html, /class="pf w0 h0"/);
   assert.match(html, /<div class="pc">one<\/div>/);
   assert.match(html, /premium-locked/);
-  assert.match(html, /studocudown-gated-page/);
+  assert.match(html, /docdown-gated-page/);
   assert.match(html, /Page 3 could not be loaded/);
   assert.ok(!html.includes('data:image/webp'), 'gated page must not embed a blurred image');
   assert.ok(!html.includes('src="data:image'), 'gated page must not embed any preview');
@@ -161,10 +161,10 @@ test('buildPrintHtml escapes the title and style terminator', () => {
   });
   assert.match(html, /<title>A &lt;b&gt;title&lt;\/b&gt;<\/title>/);
   assert.ok(html.includes('<\\/style><script>alert(1)</script>'));
-  assert.match(html, /id="studocudown-print"/);
+  assert.match(html, /id="docdown-print"/);
   assert.match(html, /<div class="pf"><\/div>/);
   assert.match(html, /filter:none!important/);
-  assert.match(html, /studocudown-gated-page/);
+  assert.match(html, /docdown-gated-page/);
 });
 
 test('stripBlurClasses removes dynamic CSS-module blur classes', () => {
@@ -308,7 +308,7 @@ test('requestFullReset reports the background worker result', async () => {
 
   const result = await LocalSH.requestFullReset();
 
-  assert.equal(sent.type, 'studocudown-reset');
+  assert.equal(sent.type, 'docdown-reset');
   assert.equal(sent.hostname, 'www.studocu.vn');
   assert.equal(result.full, true);
   assert.equal(result.cookies, 5);

@@ -1,20 +1,20 @@
 (function () {
   'use strict';
 
-  const SH = globalThis.StudocuDown;
+  const SH = globalThis.DocDown;
   if (!SH) return;
 
   const ui = {};
   SH.ui = ui;
 
   const IDs = {
-    stack: 'studocudown-fab-stack',
-    button: 'studocudown-download-button',
-    reset: 'studocudown-reset-button',
-    panel: 'studocudown-panel',
-    panelText: 'studocudown-panel-text',
-    progress: 'studocudown-progress-bar',
-    toast: 'studocudown-toast'
+    stack: 'docdown-fab-stack',
+    button: 'docdown-download-button',
+    reset: 'docdown-reset-button',
+    panel: 'docdown-panel',
+    panelText: 'docdown-panel-text',
+    progress: 'docdown-progress-bar',
+    toast: 'docdown-toast'
   };
 
   const RESET_LABEL = 'Reset phiên';
@@ -49,7 +49,7 @@
   function createStack() {
     const stack = document.createElement('div');
     stack.id = IDs.stack;
-    stack.className = 'studocudown-fab-stack';
+    stack.className = 'docdown-fab-stack';
     return stack;
   }
 
@@ -57,14 +57,14 @@
     const button = document.createElement('button');
     button.id = IDs.button;
     button.type = 'button';
-    button.className = 'studocudown-fab';
-    button.setAttribute('data-studocudown-button', 'download');
+    button.className = 'docdown-fab';
+    button.setAttribute('data-docdown-button', 'download');
     button.setAttribute('aria-label', 'Tải tài liệu thành PDF');
     button.innerHTML =
       '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
       '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" ' +
       'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '</svg><span class="studocudown-label">Tải PDF</span>';
+      '</svg><span class="docdown-label">Tải PDF</span>';
     button.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -80,7 +80,7 @@
 
   function setResetLabel(text) {
     const button = getResetButton();
-    const label = button && button.querySelector('.studocudown-label');
+    const label = button && button.querySelector('.docdown-label');
     if (label) label.textContent = text;
   }
 
@@ -90,7 +90,7 @@
     state.resetArmed = false;
     const button = getResetButton();
     if (!button) return;
-    button.classList.remove('studocudown-reset-armed');
+    button.classList.remove('docdown-reset-armed');
     button.setAttribute('aria-label', RESET_HINT);
     setResetLabel(RESET_LABEL);
   }
@@ -99,7 +99,7 @@
     const button = getResetButton();
     if (!button || button.disabled) return;
     state.resetArmed = true;
-    button.classList.add('studocudown-reset-armed');
+    button.classList.add('docdown-reset-armed');
     button.setAttribute('aria-label', RESET_HINT_ARMED);
     setResetLabel(RESET_LABEL_ARMED);
     clearTimeout(state.resetTimer);
@@ -137,14 +137,14 @@
     const button = document.createElement('button');
     button.id = IDs.reset;
     button.type = 'button';
-    button.className = 'studocudown-fab studocudown-fab-reset';
-    button.setAttribute('data-studocudown-button', 'reset');
+    button.className = 'docdown-fab docdown-fab-reset';
+    button.setAttribute('data-docdown-button', 'reset');
     button.setAttribute('aria-label', RESET_HINT);
     button.innerHTML =
       '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
       '<path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" ' +
       'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '</svg><span class="studocudown-label">' + RESET_LABEL + '</span>';
+      '</svg><span class="docdown-label">' + RESET_LABEL + '</span>';
     button.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -163,17 +163,17 @@
   function createPanel() {
     const panel = document.createElement('div');
     panel.id = IDs.panel;
-    panel.className = 'studocudown-panel';
+    panel.className = 'docdown-panel';
     panel.setAttribute('role', 'status');
     panel.setAttribute('aria-live', 'polite');
     panel.hidden = true;
 
     const text = document.createElement('div');
-    text.className = 'studocudown-panel-text';
+    text.className = 'docdown-panel-text';
     text.id = IDs.panelText;
 
     const track = document.createElement('div');
-    track.className = 'studocudown-progress';
+    track.className = 'docdown-progress';
     const bar = document.createElement('i');
     bar.id = IDs.progress;
     track.appendChild(bar);
@@ -205,11 +205,11 @@
     const button = getButton();
     const panel = getPanel();
     const resetButton = getResetButton();
-    const label = button && button.querySelector('.studocudown-label');
+    const label = button && button.querySelector('.docdown-label');
     if (!button || !panel) return;
 
     panel.hidden = false;
-    panel.classList.remove('studocudown-panel-error', 'studocudown-panel-ready');
+    panel.classList.remove('docdown-panel-error', 'docdown-panel-ready');
     button.disabled = false;
     if (resetButton) resetButton.disabled = false;
 
@@ -217,13 +217,13 @@
       button.disabled = true;
       if (resetButton) resetButton.disabled = true;
       if (label) label.textContent = 'Đang quét…';
-      panel.classList.remove('studocudown-panel-error', 'studocudown-panel-ready');
+      panel.classList.remove('docdown-panel-error', 'docdown-panel-ready');
     } else if (nextState === 'ready') {
       if (label) label.textContent = 'Tải lại PDF';
-      panel.classList.add('studocudown-panel-ready');
+      panel.classList.add('docdown-panel-ready');
     } else if (nextState === 'error') {
       if (label) label.textContent = 'Thử lại';
-      panel.classList.add('studocudown-panel-error');
+      panel.classList.add('docdown-panel-error');
     } else {
       if (label) label.textContent = 'Tải PDF';
       panel.hidden = true;
@@ -256,11 +256,11 @@
       toast.setAttribute('role', 'alert');
       document.body.appendChild(toast);
     }
-    toast.className = 'studocudown-toast' + (type ? ' studocudown-toast-' + type : '');
+    toast.className = 'docdown-toast' + (type ? ' docdown-toast-' + type : '');
     toast.textContent = String(message || '');
     clearTimeout(state.toastTimer);
     state.toastTimer = setTimeout(function () {
-      toast.classList.add('studocudown-toast-hide');
+      toast.classList.add('docdown-toast-hide');
       setTimeout(function () { toast.remove(); }, 300);
     }, 6000);
   };
@@ -324,7 +324,7 @@
         clearInterval(pinger);
         try {
           win.postMessage({
-            type: 'studocudown-print-doc',
+            type: 'docdown-print-doc',
             html: html,
             fileName: fileName
           }, origin);
@@ -337,9 +337,9 @@
         if (event.source !== win) return;
         if (origin && event.origin !== origin) return;
         const data = event.data || {};
-        if (data.type === 'studocudown-print-ready') sendDocument();
-        else if (data.type === 'studocudown-print-rendered') finish(true);
-        else if (data.type === 'studocudown-print-failed') finish(false);
+        if (data.type === 'docdown-print-ready') sendDocument();
+        else if (data.type === 'docdown-print-rendered') finish(true);
+        else if (data.type === 'docdown-print-failed') finish(false);
       }
 
       function ping() {
@@ -349,7 +349,7 @@
           return;
         }
         try {
-          win.postMessage({ type: 'studocudown-print-ping' }, origin);
+          win.postMessage({ type: 'docdown-print-ping' }, origin);
         } catch (error) {
           finish(false);
         }
@@ -366,7 +366,7 @@
     if (!win || win.closed) return;
     try {
       win.postMessage({
-        type: 'studocudown-print-error',
+        type: 'docdown-print-error',
         message: String(message || '')
       }, ui.printPageOrigin());
     } catch (error) {

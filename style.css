@@ -1,4 +1,4 @@
-.studocudown-nofilter {
+.docdown-nofilter {
   filter: none !important;
   -webkit-filter: none !important;
   opacity: 1 !important;
@@ -9,7 +9,7 @@
   -webkit-mask-image: none !important;
 }
 
-.studocudown-fab-stack {
+.docdown-fab-stack {
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -20,7 +20,7 @@
   gap: 8px;
 }
 
-#studocudown-download-button.studocudown-fab {
+#docdown-download-button.docdown-fab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -35,29 +35,29 @@
   transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
-#studocudown-download-button.studocudown-fab:hover {
+#docdown-download-button.docdown-fab:hover {
   background: #15803d;
   transform: translateY(-1px);
 }
 
-#studocudown-download-button.studocudown-fab:focus-visible {
+#docdown-download-button.docdown-fab:focus-visible {
   outline: 3px solid #bbf7d0;
   outline-offset: 2px;
 }
 
-#studocudown-download-button.studocudown-fab:disabled {
+#docdown-download-button.docdown-fab:disabled {
   opacity: 0.7;
   cursor: wait;
   transform: none;
 }
 
-#studocudown-download-button.studocudown-fab svg {
+#docdown-download-button.docdown-fab svg {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
 }
 
-#studocudown-reset-button.studocudown-fab-reset {
+#docdown-reset-button.docdown-fab-reset {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -72,35 +72,35 @@
   transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
-#studocudown-reset-button.studocudown-fab-reset:hover {
+#docdown-reset-button.docdown-fab-reset:hover {
   background: #1f2937;
 }
 
-#studocudown-reset-button.studocudown-fab-reset:focus-visible {
+#docdown-reset-button.docdown-fab-reset:focus-visible {
   outline: 3px solid #e5e7eb;
   outline-offset: 2px;
 }
 
-#studocudown-reset-button.studocudown-fab-reset:disabled {
+#docdown-reset-button.docdown-fab-reset:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-#studocudown-reset-button.studocudown-fab-reset.studocudown-reset-armed {
+#docdown-reset-button.docdown-fab-reset.docdown-reset-armed {
   background: #b91c1c;
 }
 
-#studocudown-reset-button.studocudown-fab-reset.studocudown-reset-armed:hover {
+#docdown-reset-button.docdown-fab-reset.docdown-reset-armed:hover {
   background: #991b1b;
 }
 
-#studocudown-reset-button.studocudown-fab-reset svg {
+#docdown-reset-button.docdown-fab-reset svg {
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
 }
 
-#studocudown-panel {
+#docdown-panel {
   position: fixed;
   right: 20px;
   bottom: 124px;
@@ -115,31 +115,31 @@
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-#studocudown-panel[hidden] {
+#docdown-panel[hidden] {
   display: none;
 }
 
-#studocudown-panel.studocudown-panel-error {
+#docdown-panel.docdown-panel-error {
   border: 1px solid #ef4444;
 }
 
-#studocudown-panel.studocudown-panel-ready {
+#docdown-panel.docdown-panel-ready {
   border: 1px solid #22c55e;
 }
 
-.studocudown-panel-text {
+.docdown-panel-text {
   margin-bottom: 8px;
   overflow-wrap: anywhere;
 }
 
-.studocudown-progress {
+.docdown-progress {
   height: 5px;
   overflow: hidden;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.18);
 }
 
-.studocudown-progress > i {
+.docdown-progress > i {
   display: block;
   width: 0;
   height: 100%;
@@ -147,7 +147,7 @@
   transition: width 0.2s ease;
 }
 
-#studocudown-toast {
+#docdown-toast {
   position: fixed;
   left: 50%;
   bottom: 148px;
@@ -163,51 +163,51 @@
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-#studocudown-toast.studocudown-toast-error {
+#docdown-toast.docdown-toast-error {
   background: #991b1b;
 }
 
-#studocudown-toast.studocudown-toast-hide {
+#docdown-toast.docdown-toast-hide {
   opacity: 0;
   transform: translate(-50%, 8px);
 }
 
 @media (max-width: 600px) {
-  .studocudown-fab-stack {
+  .docdown-fab-stack {
     right: 12px;
     bottom: 12px;
   }
 
-  #studocudown-download-button.studocudown-fab {
+  #docdown-download-button.docdown-fab {
     padding: 12px;
     border-radius: 9999px;
   }
 
-  #studocudown-download-button.studocudown-fab .studocudown-label {
+  #docdown-download-button.docdown-fab .docdown-label {
     display: none;
   }
 
-  #studocudown-reset-button.studocudown-fab-reset {
+  #docdown-reset-button.docdown-fab-reset {
     padding: 9px 11px;
   }
 
-  #studocudown-panel {
+  #docdown-panel {
     right: 12px;
     bottom: 116px;
     width: calc(100vw - 24px);
   }
 
-  #studocudown-toast {
+  #docdown-toast {
     bottom: 140px;
   }
 }
 
 @media print {
-  .studocudown-fab-stack,
-  #studocudown-download-button,
-  #studocudown-reset-button,
-  #studocudown-panel,
-  #studocudown-toast {
+  .docdown-fab-stack,
+  #docdown-download-button,
+  #docdown-reset-button,
+  #docdown-panel,
+  #docdown-toast {
     display: none !important;
   }
 }

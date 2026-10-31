@@ -28,12 +28,12 @@ function createPrintContext() {
     return button;
   }
 
-  const printButton = createButton('studocudown-print');
-  const closeButton = createButton('studocudown-close');
+  const printButton = createButton('docdown-print');
+  const closeButton = createButton('docdown-close');
 
   const documentStub = {
     readyState: 'complete',
-    title: 'StudocuDown',
+    title: 'DocDown',
     fonts: { ready: Promise.resolve() },
     images: [],
     head: { appendChild() {} },
@@ -100,14 +100,14 @@ test('print page renders the posted document and names the tab', async () => {
   const ctx = createPrintContext();
 
   ctx.deliver('https://www.studocu.vn', {
-    type: 'studocudown-print-doc',
+    type: 'docdown-print-doc',
     html: '<!doctype html><html><body><div class="pf"></div></body></html>',
     fileName: 'Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227'
   });
   await new Promise((resolve) => setTimeout(resolve, 20));
 
   assert.equal(ctx.documentStub.title, 'Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227');
-  assert.ok(ctx.posts.some((m) => m.type === 'studocudown-print-rendered'));
+  assert.ok(ctx.posts.some((m) => m.type === 'docdown-print-rendered'));
   assert.ok(ctx.state.written[0].includes('class="pf"'));
   assert.equal(ctx.printButton.disabled, false, 'print button is enabled after loading');
 });
@@ -115,7 +115,7 @@ test('print page renders the posted document and names the tab', async () => {
 test('the print button prints from the page itself', async () => {
   const ctx = createPrintContext();
   ctx.deliver('https://www.studocu.vn', {
-    type: 'studocudown-print-doc',
+    type: 'docdown-print-doc',
     html: '<html><body><div class="pf"></div></body></html>',
     fileName: 'Ten file'
   });
@@ -129,20 +129,20 @@ test('the print button prints from the page itself', async () => {
 test('documents from an unexpected origin are ignored', async () => {
   const ctx = createPrintContext();
   ctx.deliver('https://evil.test', {
-    type: 'studocudown-print-doc',
+    type: 'docdown-print-doc',
     html: '<html><body>evil</body></html>',
     fileName: 'evil'
   });
   await new Promise((resolve) => setTimeout(resolve, 20));
 
-  assert.equal(ctx.documentStub.title, 'StudocuDown', 'title must not change');
+  assert.equal(ctx.documentStub.title, 'DocDown', 'title must not change');
   assert.equal(ctx.state.written.length, 0, 'nothing may be written');
 });
 
 test('script tags inside a posted document are stripped', async () => {
   const ctx = createPrintContext();
   ctx.deliver('https://www.studocu.com', {
-    type: 'studocudown-print-doc',
+    type: 'docdown-print-doc',
     html: '<html><body><script>alert(1)<\/script><p>ok</p></body></html>',
     fileName: 'x'
   });
@@ -156,7 +156,7 @@ test('script tags inside a posted document are stripped', async () => {
 test('error messages replace the page with a readable note', () => {
   const ctx = createPrintContext();
   ctx.deliver('https://www.studocu.vn', {
-    type: 'studocudown-print-error',
+    type: 'docdown-print-error',
     message: 'Không tải được tài liệu'
   });
   assert.ok(ctx.state.written.length === 1);

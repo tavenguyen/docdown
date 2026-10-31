@@ -1,10 +1,10 @@
 (function () {
   'use strict';
 
-  const SH = globalThis.StudocuDown;
+  const SH = globalThis.DocDown;
   if (!SH) return;
 
-  const PREFIX = 'studocudown-print';
+  const PREFIX = 'docdown-print';
 
   function post(message) {
     try {
@@ -78,16 +78,16 @@
       const key = width + 'x' + height;
       if (!names[key]) {
         index += 1;
-        names[key] = 'studocudown-page-' + index;
+        names[key] = 'docdown-page-' + index;
         rules.push('@page ' + names[key] + ' { size: ' + width + 'px ' + height + 'px; margin: 0; }');
       }
       pf.style.setProperty('page', names[key]);
     });
 
-    let style = document.getElementById('studocudown-page-sizes');
+    let style = document.getElementById('docdown-page-sizes');
     if (!style) {
       style = document.createElement('style');
-      style.id = 'studocudown-page-sizes';
+      style.id = 'docdown-page-sizes';
       document.head.appendChild(style);
     }
     style.textContent = rules.length ? rules.join('\n') : '@page { size: A4 portrait; margin: 0; }';
@@ -97,13 +97,13 @@
   // loaded. Hide it and label the page instead of printing a blurred sheet.
   function hideBrokenImages() {
     Array.prototype.slice.call(document.images || []).forEach(function (img) {
-      if (!img.getAttribute('data-studocudown-original')) return;
+      if (!img.getAttribute('data-docdown-original')) return;
       if (img.complete && img.naturalWidth > 0) return;
       img.style.setProperty('display', 'none', 'important');
       const page = img.closest('.pf');
-      if (page && !page.querySelector('.studocudown-gated-note')) {
+      if (page && !page.querySelector('.docdown-gated-note')) {
         const note = document.createElement('div');
-        note.className = 'studocudown-gated-note';
+        note.className = 'docdown-gated-note';
         note.textContent = 'Preview only — the clear image is not available.';
         page.appendChild(note);
       }
@@ -111,7 +111,7 @@
   }
 
   async function prepare(fileName) {
-    const printButton = document.getElementById('studocudown-print');
+    const printButton = document.getElementById('docdown-print');
     try {
       if (document.fonts && document.fonts.ready) {
         await withTimeout(document.fonts.ready, 4000);
@@ -158,8 +158,8 @@
 
     setTitle(fileName);
 
-    const printButton = document.getElementById('studocudown-print');
-    const closeButton = document.getElementById('studocudown-close');
+    const printButton = document.getElementById('docdown-print');
+    const closeButton = document.getElementById('docdown-close');
 
     window.addEventListener('beforeprint', function () {
       setTitle(fileName);
@@ -186,15 +186,15 @@
   function showError(message) {
     try {
       document.open();
-      document.write('<!doctype html><html><head><meta charset="utf-8"><title>StudocuDown</title>' +
+      document.write('<!doctype html><html><head><meta charset="utf-8"><title>DocDown</title>' +
         '<style>body{margin:0;padding:24px;background:#fff;color:#111;font:15px/1.5 system-ui,sans-serif}' +
         'h1{margin:0 0 8px;font-size:18px}p{margin:0;color:#b91c1c}</style></head><body>' +
-        '<h1>StudocuDown</h1><p id="studocudown-error"></p></body></html>');
+        '<h1>DocDown</h1><p id="docdown-error"></p></body></html>');
       document.close();
     } catch (error) {
       // Nothing else can be shown in this tab.
     }
-    const target = document.getElementById('studocudown-error');
+    const target = document.getElementById('docdown-error');
     if (target) target.textContent = String(message || 'Đã xảy ra lỗi.');
   }
 

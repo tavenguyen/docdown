@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
 
-  "name": "StudocuDown",
+  "name": "DocDown",
   "version": "1.0.0",
   "description": "Chrome extension that rebuilds Studocu documents into print-ready PDFs from the pages the site already sends.",
-  "author": "StudocuDown",
+  "author": "DocDown",
   "icons": {
     "128": "img/icon.png"
   },

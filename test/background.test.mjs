@@ -89,14 +89,14 @@ function loadBackground(options) {
     });
   }
 
-  return { calls, send, StudocuDown: context.StudocuDown };
+  return { calls, send, DocDown: context.DocDown };
 }
 
 test('reset message removes cookies and browsing data for the sender tab', async () => {
   const { calls, send } = loadBackground();
 
   const result = await send(
-    { type: 'studocudown-reset', hostname: 'www.studocu.vn' },
+    { type: 'docdown-reset', hostname: 'www.studocu.vn' },
     { id: 'extension-id', tab: { id: 1, url: 'https://www.studocu.vn/document/x' } }
   );
 
@@ -142,7 +142,7 @@ test('reset message is rejected for unsupported hosts', async () => {
   const { calls, send } = loadBackground();
 
   const result = await send(
-    { type: 'studocudown-reset', hostname: 'evil.test' },
+    { type: 'docdown-reset', hostname: 'evil.test' },
     { id: 'extension-id', tab: { id: 1 } }
   );
 
@@ -156,7 +156,7 @@ test('messages from another extension id are rejected', async () => {
   const { calls, send } = loadBackground();
 
   const result = await send(
-    { type: 'studocudown-reset', hostname: 'www.studocu.com' },
+    { type: 'docdown-reset', hostname: 'www.studocu.com' },
     { id: 'someone-else', tab: { id: 1 } }
   );
 
@@ -174,7 +174,7 @@ test('unrelated messages are not handled', async () => {
 test('when the sender tab is unknown, every cookie store is cleared', async () => {
   const { calls, send } = loadBackground();
 
-  const result = await send({ type: 'studocudown-reset', hostname: 'www.studocu.vn' }, { id: 'extension-id' });
+  const result = await send({ type: 'docdown-reset', hostname: 'www.studocu.vn' }, { id: 'extension-id' });
 
   assert.equal(result.ok, true);
   assert.equal(result.cookies, 3);
@@ -185,7 +185,7 @@ test('browsing data failure still reports the cookie removal', async () => {
   const { send } = loadBackground({ browsingDataError: 'not permitted' });
 
   const result = await send(
-    { type: 'studocudown-reset', hostname: 'www.studocu.vn' },
+    { type: 'docdown-reset', hostname: 'www.studocu.vn' },
     { id: 'extension-id', tab: { id: 1 } }
   );
 

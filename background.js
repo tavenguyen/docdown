@@ -1,9 +1,9 @@
 importScripts('content/core.js');
 
-const SH = globalThis.StudocuDown;
-if (!SH) throw new Error('StudocuDown core did not load');
+const SH = globalThis.DocDown;
+if (!SH) throw new Error('DocDown core did not load');
 
-const RESET_MESSAGE = 'studocudown-reset';
+const RESET_MESSAGE = 'docdown-reset';
 const ASSET_ORIGINS = [
   'https://doc-assets.studocu.com',
   'https://website-assets.studocu.com'

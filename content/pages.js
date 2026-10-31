@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const SH = globalThis.StudocuDown;
+  const SH = globalThis.DocDown;
   if (!SH) return;
 
   const pages = {};
@@ -91,7 +91,7 @@
     }
     el.style.setProperty('pointer-events', 'auto', 'important');
     el.style.setProperty('user-select', 'auto', 'important');
-    el.classList.add('studocudown-nofilter');
+    el.classList.add('docdown-nofilter');
   }
 
   function deblurUrl(url) {
@@ -102,7 +102,7 @@
   function unblurImage(img) {
     if (!img) return;
     applyNoFilter(img);
-    if (img.dataset.studocudownUnblurred === '1') return;
+    if (img.dataset.docdownUnblurred === '1') return;
 
     const src = img.getAttribute('src') || '';
     const dataSrc = img.getAttribute('data-src') || '';
@@ -110,19 +110,19 @@
     const clear = deblurUrl(src);
 
     if (clear && clear !== src) {
-      img.dataset.studocudownOriginal = src;
-      img.dataset.studocudownUnblurred = '1';
+      img.dataset.docdownOriginal = src;
+      img.dataset.docdownUnblurred = '1';
       img.removeAttribute('srcset');
       img.onerror = function () {
         img.onerror = null;
-        if (img.dataset.studocudownOriginal) img.src = img.dataset.studocudownOriginal;
+        if (img.dataset.docdownOriginal) img.src = img.dataset.docdownOriginal;
       };
       img.src = clear;
     } else if (dataSrc) {
       const clearData = deblurUrl(dataSrc);
       if (clearData && clearData !== dataSrc) {
         img.setAttribute('data-src', clearData);
-        img.dataset.studocudownUnblurred = '1';
+        img.dataset.docdownUnblurred = '1';
       }
     }
 
@@ -131,7 +131,7 @@
         'srcset',
         srcset.replace(/\/pages\/blurred\//g, '/pages/').replace(/\/blurred\//g, '/')
       );
-      img.dataset.studocudownUnblurred = '1';
+      img.dataset.docdownUnblurred = '1';
     }
   }
 

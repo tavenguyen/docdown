@@ -2,7 +2,7 @@
   'use strict';
 
   const SH = {};
-  globalThis.StudocuDown = SH;
+  globalThis.DocDown = SH;
 
   SH.VERSION = (function () {
     try {
@@ -12,7 +12,7 @@
     }
   })();
 
-  SH.LOG_PREFIX = 'StudocuDown:';
+  SH.LOG_PREFIX = 'DocDown:';
   SH.log = function () {
     console.log.apply(console, [SH.LOG_PREFIX].concat(Array.prototype.slice.call(arguments)));
   };
@@ -56,7 +56,7 @@
     return Array.prototype.slice.call(
       document.querySelectorAll('#page-container .pf, .p2hv .pf')
     ).filter(function (pf) {
-      return !pf.closest('#studocudown-print-root');
+      return !pf.closest('#docdown-print-root');
     });
   };
 
@@ -511,21 +511,21 @@
         const text = unavailable
           ? 'The page content could not be fetched. Reload the document and try again.'
           : 'Studocu does not send this page to non-subscribers, so it cannot be unblurred here.';
-        inner = '<div class="pc"><div class="studocudown-gated-page">' +
-          '<div class="studocudown-gated-title">' + SH.escapeHtml(title) + '</div>' +
-          '<div class="studocudown-gated-text">' + SH.escapeHtml(text) + '</div></div></div>';
+        inner = '<div class="pc"><div class="docdown-gated-page">' +
+          '<div class="docdown-gated-title">' + SH.escapeHtml(title) + '</div>' +
+          '<div class="docdown-gated-text">' + SH.escapeHtml(text) + '</div></div></div>';
       } else if (result.html) {
         inner = result.html;
       } else if (result.bgDataUrl) {
         inner = '<div class="pc"><img class="bi x0 y0 w1 h1" alt="" src="' +
           SH.escapeAttr(result.bgDataUrl) + '"></div>';
       } else {
-        inner = '<div class="pc"><div class="studocudown-empty">Page ' +
+        inner = '<div class="pc"><div class="docdown-empty">Page ' +
           SH.escapeHtml(pageNumber) + ' could not be loaded.</div></div>';
       }
 
       return '<div class="' + SH.escapeAttr(className) + '" data-page-no="' +
-        SH.escapeAttr(pageNumber) + '" data-studocudown-page="' + SH.escapeAttr(pageNumber) + '">' +
+        SH.escapeAttr(pageNumber) + '" data-docdown-page="' + SH.escapeAttr(pageNumber) + '">' +
         inner + '</div>';
     }).join('');
   };
@@ -541,36 +541,36 @@
 
     const printCss = [
       'html,body{margin:0!important;padding:0!important;background:#fff!important}',
-      '.studocudown-print-root{margin:0!important;padding:0!important}',
-      '.studocudown-pages{margin:0!important;padding:0!important}',
+      '.docdown-print-root{margin:0!important;padding:0!important}',
+      '.docdown-pages{margin:0!important;padding:0!important}',
       '.p2hv .pf,.p2hv .pc,.p2hv .page-content,.p2hv .bi,.p2hv img{filter:none!important;-webkit-filter:none!important;opacity:1!important;visibility:visible!important;clip-path:none!important;-webkit-clip-path:none!important;mask-image:none!important;-webkit-mask-image:none!important}',
       '.p2hv .t{filter:none!important;-webkit-filter:none!important;opacity:1!important;clip-path:none!important;-webkit-clip-path:none!important;mask-image:none!important;-webkit-mask-image:none!important}',
-      '.studocudown-gated-page{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:36px;background:#fff;color:#111;text-align:center;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}',
-      '.studocudown-gated-title{font-size:24px;font-weight:700}',
-      '.studocudown-gated-text{max-width:430px;color:#555}',
+      '.docdown-gated-page{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:36px;background:#fff;color:#111;text-align:center;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}',
+      '.docdown-gated-title{font-size:24px;font-weight:700}',
+      '.docdown-gated-text{max-width:430px;color:#555}',
       '.p2hv .pf{margin:0!important;box-shadow:none!important;page-break-after:always!important;page-break-inside:avoid!important}',
       '.p2hv .pf:last-child{page-break-after:auto!important}',
-      '.studocudown-toolbar{position:fixed;top:0;left:0;right:0;z-index:2147483647;display:flex;gap:10px;align-items:center;padding:10px 14px;background:#1f2937;color:#fff;font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}',
-      '.studocudown-toolbar-title{font-weight:700}',
-      '.studocudown-toolbar-meta{opacity:.75}',
-      '.studocudown-toolbar-actions{margin-left:auto;display:flex;gap:8px}',
-      '.studocudown-toolbar button{appearance:none;border:0;border-radius:6px;padding:7px 12px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer}',
-      '.studocudown-toolbar button:disabled{opacity:.5;cursor:wait}',
-      '#studocudown-print{background:#16a34a;color:#fff}',
-      '#studocudown-close{background:#374151;color:#fff}',
-      '.studocudown-gated-note{position:absolute;top:8px;left:8px;right:8px;z-index:5;background:rgba(153,27,27,.94);color:#fff;font:600 12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;padding:6px 8px;border-radius:4px}',
-      '.studocudown-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#666;font:14px system-ui,-apple-system,Segoe UI,sans-serif}',
-      '@media print{.studocudown-toolbar{display:none!important}body{background:#fff!important}.p2hv .pf{margin:0!important;box-shadow:none!important}}',
+      '.docdown-toolbar{position:fixed;top:0;left:0;right:0;z-index:2147483647;display:flex;gap:10px;align-items:center;padding:10px 14px;background:#1f2937;color:#fff;font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}',
+      '.docdown-toolbar-title{font-weight:700}',
+      '.docdown-toolbar-meta{opacity:.75}',
+      '.docdown-toolbar-actions{margin-left:auto;display:flex;gap:8px}',
+      '.docdown-toolbar button{appearance:none;border:0;border-radius:6px;padding:7px 12px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer}',
+      '.docdown-toolbar button:disabled{opacity:.5;cursor:wait}',
+      '#docdown-print{background:#16a34a;color:#fff}',
+      '#docdown-close{background:#374151;color:#fff}',
+      '.docdown-gated-note{position:absolute;top:8px;left:8px;right:8px;z-index:5;background:rgba(153,27,27,.94);color:#fff;font:600 12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;padding:6px 8px;border-radius:4px}',
+      '.docdown-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#666;font:14px system-ui,-apple-system,Segoe UI,sans-serif}',
+      '@media print{.docdown-toolbar{display:none!important}body{background:#fff!important}.p2hv .pf{margin:0!important;box-shadow:none!important}}',
       '@media screen{body{background:#525659!important;padding:64px 16px 24px!important}.p2hv .pf{margin:0 auto 24px!important;box-shadow:0 2px 14px rgba(0,0,0,.35)!important}}'
     ].join('\n');
 
     return '<!doctype html><html><head><meta charset="utf-8"><title>' + title +
-      '</title><style>' + css + '\n' + printCss + '</style></head><body class="studocudown-print-body">' +
-      '<div class="studocudown-toolbar no-print"><div class="studocudown-toolbar-title">StudocuDown v' + version +
-      '</div><div class="studocudown-toolbar-meta">' + total + ' pages &middot; ' + fileName + '</div>' +
-      '<div class="studocudown-toolbar-actions"><button id="studocudown-print" type="button" disabled>Print / Save as PDF</button>' +
-      '<button id="studocudown-close" type="button">Close</button></div></div>' +
-      '<div class="p2hv studocudown-print-root"><div class="studocudown-pages">' + pagesHtml +
+      '</title><style>' + css + '\n' + printCss + '</style></head><body class="docdown-print-body">' +
+      '<div class="docdown-toolbar no-print"><div class="docdown-toolbar-title">DocDown v' + version +
+      '</div><div class="docdown-toolbar-meta">' + total + ' pages &middot; ' + fileName + '</div>' +
+      '<div class="docdown-toolbar-actions"><button id="docdown-print" type="button" disabled>Print / Save as PDF</button>' +
+      '<button id="docdown-close" type="button">Close</button></div></div>' +
+      '<div class="p2hv docdown-print-root"><div class="docdown-pages">' + pagesHtml +
       '</div></div></body></html>';
   };
 
@@ -581,7 +581,7 @@
     const clone = page.cloneNode(true);
     clone.removeAttribute('style');
     clone.querySelectorAll(
-      '[data-studocudown-button], .studocudown-fab, .studocudown-panel, .studocudown-gated-note, ' +
+      '[data-docdown-button], .docdown-fab, .docdown-panel, .docdown-gated-note, ' +
       '[class*="PremiumPageClarification"]'
     ).forEach(function (el) { el.remove(); });
 
@@ -597,7 +597,7 @@
       const src = String(img.getAttribute('src') || '');
       const clear = src.replace('/pages/blurred/', '/pages/').replace('/blurred/', '/');
       if (clear && clear !== src) {
-        img.setAttribute('data-studocudown-original', src);
+        img.setAttribute('data-docdown-original', src);
         img.setAttribute('src', clear);
       }
       img.setAttribute('loading', 'eager');
@@ -695,7 +695,7 @@
     return summary;
   };
 
-  SH.RESET_MESSAGE = 'studocudown-reset';
+  SH.RESET_MESSAGE = 'docdown-reset';
 
   function sendResetMessage(runtime, hostname) {
     return new Promise(function (resolve) {
