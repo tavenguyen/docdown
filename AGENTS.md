@@ -26,7 +26,7 @@ Run these before reporting completion:
 
 ```powershell
 Get-ChildItem lib\*.js, providers\*.js, content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
-node --test test/core.test.mjs test/tailieu.test.mjs test/scribd.test.mjs test/manifest.test.mjs test/background.test.mjs test/print.test.mjs
+node --test test/core.test.mjs test/tailieu.test.mjs test/scribd.test.mjs test/slideshare.test.mjs test/manifest.test.mjs test/background.test.mjs test/print.test.mjs
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ```
 
@@ -36,7 +36,8 @@ For the browser path, load the unpacked extension and test:
 - a TaiLieu.VN document with a full public PDF, one with a truncated PDF, and
   one without a public PDF, including a 375 px viewport;
 - a Scribd document that loads every page, and one with blurred pages, including
-  a 375 px viewport.
+  a 375 px viewport;
+- a SlideShare presentation, including a 375 px viewport.
 
 ## Architecture
 
@@ -54,14 +55,16 @@ For the browser path, load the unpacked extension and test:
 - Manifest V3 only. Do not add permissions unless the feature cannot work
   without them.
 - Approved permissions: `cookies` and `browsingData`, plus `host_permissions`
-  for the four Studocu domains, `tailieu.vn`, `scribd.com` and
-  `scribdassets.com`. They exist for the Reset phiên flow (removing `HttpOnly`
-  cookies, HTTP cache, and service workers) and for site detection. Ask before
-  adding more.
+  for the four Studocu domains, `tailieu.vn`, `scribd.com`, `scribdassets.com`,
+  `slideshare.net` and `slidesharecdn.com`. They exist for the Reset phiên flow
+  (removing `HttpOnly` cookies, HTTP cache, and service workers) and for site
+  detection. Ask before adding more.
 - Only fetch from:
   - `https://doc-assets.studocu.com/` and `https://website-assets.studocu.com/`;
   - `https://cdn.tailieu.vn/files/source/` and `https://cdn.tailieu.vn/files/html/`;
-  - `https://html.scribdassets.com/<prefix>/pages/`, `/images/` and `/fonts/`.
+  - `https://html.scribdassets.com/<prefix>/pages/`, `/images/` and `/fonts/`;
+  - `https://image.slidesharecdn.com/<location>/<quality>/<slug>-<n>-<width>.jpg`
+    (displayed with `<img>` only: the CDN sends no CORS headers).
 - Validate every fetched URL: HTTPS, allowlisted host, no path traversal, and
   the expected file type before saving.
 - Sanitize fetched page HTML: remove `script`, `iframe`, `object`, `embed`,

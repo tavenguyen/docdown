@@ -10,6 +10,8 @@ pages and downloads the file in one click.
   opens a print-ready tab you can save as PDF.
 - **Scribd** — rebuilds the document from the page layers the viewer loads, then
   opens the same print-ready tab.
+- **SlideShare** — saves every slide from the viewer's slide images, one per
+  page, through the same print-ready tab.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -65,6 +67,17 @@ downloads, using the document's own fonts and page size. Pages Scribd marks as
 blurred for your account render as white pages with a note; the blurred preview
 is never embedded.
 
+### SlideShare
+
+1. Open a presentation on `slideshare.net/slideshow/…`.
+2. Click **Tải PDF** at the bottom-right.
+3. DocDown checks every slide image, then opens the preview; click
+   **Print / Save as PDF**.
+
+Each slide becomes one page at the presentation's own aspect ratio, using the
+2048 px slide image. A slide whose image does not download is printed as a
+white page with a note instead of a broken image.
+
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click again
@@ -84,6 +97,7 @@ server never sends their content to non-subscribers.
 | `tailieu.vn` | original PDF from `cdn.tailieu.vn`, with a preview warning when truncated |
 | `studocu.com`, `studocu.vn`, `studocu.id`, `studeersnel.nl` | rebuild + print preview |
 | `scribd.com` | rebuild from the viewer's page layers + print preview |
+| `slideshare.net` | slide images from `image.slidesharecdn.com` + print preview |
 
 ## Limits
 
@@ -92,6 +106,8 @@ server never sends their content to non-subscribers.
 - TaiLieu.VN documents with a truncated public PDF are labelled as previews.
 - Scribd pages flagged as blurred are printed as white note pages; the extension
   does not reconstruct content the site hides for your account.
+- SlideShare presentations are saved from the slide images the viewer loads; the
+  original PPTX/DOCX download stays behind SlideShare's own login flow.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 
