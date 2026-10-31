@@ -193,6 +193,7 @@
     if (provider) state.provider = provider;
     const active = state.provider;
     if (!active || (typeof active.isDocumentPage === 'function' && !active.isDocumentPage())) return;
+    if (typeof active.isAvailable === 'function' && !active.isAvailable()) return;
     if (!document.body) return;
     let stack = getStack();
     if (!stack) {

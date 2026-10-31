@@ -15,7 +15,8 @@
     "https://*.studocu.com/*",
     "https://*.studocu.vn/*",
     "https://*.studocu.id/*",
-    "https://*.studeersnel.nl/*"
+    "https://*.studeersnel.nl/*",
+    "https://*.tailieu.vn/*"
   ],
 
   "background": {
@@ -29,7 +30,8 @@
         "https://*.studocu.com/*",
         "https://*.studocu.vn/*",
         "https://*.studocu.id/*",
-        "https://*.studeersnel.nl/*"
+        "https://*.studeersnel.nl/*",
+        "https://tailieu.vn/doc/*"
       ]
     }
   ],
@@ -40,7 +42,8 @@
         "https://*.studocu.com/*",
         "https://*.studocu.vn/*",
         "https://*.studocu.id/*",
-        "https://*.studeersnel.nl/*"
+        "https://*.studeersnel.nl/*",
+        "https://tailieu.vn/doc/*"
       ],
       "js": [
         "lib/core.js",
@@ -48,6 +51,7 @@
         "lib/render.js",
         "lib/registry.js",
         "providers/studocu.js",
+        "providers/tailieu.js",
         "content/ui.js",
         "content/main.js"
       ],

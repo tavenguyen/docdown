@@ -8,7 +8,8 @@ const APP_SOURCES = [
   '../lib/sanitize.js',
   '../lib/render.js',
   '../lib/registry.js',
-  '../providers/studocu.js'
+  '../providers/studocu.js',
+  '../providers/tailieu.js'
 ].map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 
 function loadCore(overrides) {
@@ -206,13 +207,16 @@ test('clearBlurStyles removes inline blur and only forces visibility when asked'
   assert.equal(textProps.visibility, 'hidden', 'text lines keep inline/class visibility');
 });
 
-test('isSupportedHost accepts Studocu domains and rejects lookalikes', () => {
+test('isSupportedHost accepts known domains and rejects lookalikes', () => {
   const LocalSH = loadCore();
   assert.equal(LocalSH.isSupportedHost('www.studocu.vn'), true);
   assert.equal(LocalSH.isSupportedHost('studocu.com'), true);
   assert.equal(LocalSH.isSupportedHost('www.studocu.id'), true);
   assert.equal(LocalSH.isSupportedHost('www.studeersnel.nl'), true);
+  assert.equal(LocalSH.isSupportedHost('tailieu.vn'), true);
+  assert.equal(LocalSH.isSupportedHost('cdn.tailieu.vn'), true);
   assert.equal(LocalSH.isSupportedHost('studocu.com.evil.test'), false);
+  assert.equal(LocalSH.isSupportedHost('tailieu.vn.evil.test'), false);
   assert.equal(LocalSH.isSupportedHost('evil.test'), false);
 });
 
@@ -372,12 +376,14 @@ test('buildPrintHtml shows the PDF file name in the preview toolbar', () => {
   assert.match(html, /<title>Đề Cương/);
 });
 
-test('isAllowedPrintOrigin accepts only the four Studocu domains', () => {
+test('isAllowedPrintOrigin accepts only supported document origins', () => {
   assert.equal(SH.isAllowedPrintOrigin('https://www.studocu.vn'), true);
   assert.equal(SH.isAllowedPrintOrigin('https://studocu.com'), true);
   assert.equal(SH.isAllowedPrintOrigin('https://www.studocu.id'), true);
   assert.equal(SH.isAllowedPrintOrigin('https://www.studeersnel.nl'), true);
+  assert.equal(SH.isAllowedPrintOrigin('https://tailieu.vn'), true);
   assert.equal(SH.isAllowedPrintOrigin('https://studocu.com.evil.test'), false);
+  assert.equal(SH.isAllowedPrintOrigin('https://tailieu.vn.evil.test'), false);
   assert.equal(SH.isAllowedPrintOrigin('http://www.studocu.vn'), false);
   assert.equal(SH.isAllowedPrintOrigin('chrome-extension://abc'), false);
   assert.equal(SH.isAllowedPrintOrigin(''), false);
@@ -404,4 +410,24 @@ test('mapLimit preserves order and respects the concurrency limit', async () => 
   });
   assert.deepEqual(Array.from(result), [2, 4, 6, 8, 10]);
   assert.ok(maxActive <= 2, 'max concurrency was ' + maxActive);
+});
+
+test('buildFileName strips the TaiLieu.VN site suffix', () => {
+  assert.equal(SH.buildFileName('Bài giảng | TaiLieu.VN'), 'Bài giảng');
+  assert.equal(SH.buildFileName('Bài giảng - tailieu.vn'), 'Bài giảng');
+});
+
+test('countPdfPages reads the page tree count and ignores missing data', () => {
+  const bytes = new TextEncoder().encode('%PDF-1.6\n1 0 obj << /Type /Pages /Count 53 >> endobj\n%%EOF');
+  assert.equal(SH.countPdfPages(bytes), 53);
+  assert.equal(SH.countPdfPages(new Uint8Array(0)), null);
+});
+
+test('assetAllowed accepts only the registered provider asset hosts', () => {
+  const sample = 'https://cdn.tailieu.vn/files/source/2026/20261014/user/a.pdf';
+  assert.equal(SH.assetAllowed(sample), true);
+  assert.equal(SH.assetAllowed('https://cdn.tailieu.vn/files/source/../../evil.pdf'), false);
+  assert.equal(SH.assetAllowed('https://tailieu.vn/files/source/a.pdf'), false);
+  assert.equal(SH.assetAllowed('https://doc-assets.studocu.com/a/b.png'), true);
+  assert.equal(SH.assetAllowed('https://evil.test/a.pdf'), false);
 });
