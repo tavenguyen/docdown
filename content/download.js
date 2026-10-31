@@ -174,12 +174,11 @@
       total: results.length
     });
 
-    if (!SH.ui.writePrintWindow(win, html)) {
+    const fileName = SH.buildFileName(meta.title);
+    const delivered = await SH.ui.deliverPrintDocument(win, html, fileName);
+    if (!delivered) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
-    const fileName = SH.buildFileName(meta.title);
-    SH.ui.setPrintTitle(win, fileName);
-    await finalizePrintWindow(win, fileName);
     SH.ui.progress(results.length, results.length, 'Sẵn sàng in');
     let status = 'Đã tạo bản in (' + results.length + ' trang';
     if (locked.length) status += ', ' + locked.length + ' bị khóa';
@@ -223,165 +222,19 @@
       pagesHtml: pagesHtml,
       total: total
     });
-    if (!SH.ui.writePrintWindow(win, html)) {
+    const fileName = SH.buildFileName(SH.getTitle());
+    const delivered = await SH.ui.deliverPrintDocument(win, html, fileName);
+    if (!delivered) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
-    const fileName = SH.buildFileName(SH.getTitle());
-    SH.ui.setPrintTitle(win, fileName);
-    await finalizePrintWindow(win, fileName);
     SH.ui.setState('ready', 'Đã tạo bản in từ DOM (' + total + ' trang)');
-  }
-
-  function applyPageSizes(win) {
-    const doc = win.document;
-    const pfs = Array.prototype.slice.call(doc.querySelectorAll('.pf'));
-    if (!pfs.length) return;
-
-    const names = {};
-    const rules = [];
-    let index = 0;
-
-    pfs.forEach(function (pf) {
-      const rect = pf.getBoundingClientRect();
-      const width = Math.round(rect.width);
-      const height = Math.round(rect.height);
-      if (!(width > 0 && height > 0)) return;
-      const key = width + 'x' + height;
-      if (!names[key]) {
-        index += 1;
-        names[key] = 'studocudown-page-' + index;
-        rules.push('@page ' + names[key] + ' { size: ' + width + 'px ' + height + 'px; margin: 0; }');
-      }
-      pf.style.setProperty('page', names[key]);
-    });
-
-    let style = doc.getElementById('studocudown-page-sizes');
-    if (!style) {
-      style = doc.createElement('style');
-      style.id = 'studocudown-page-sizes';
-      doc.head.appendChild(style);
-    }
-    style.textContent = rules.length ? rules.join('\n') : '@page { size: A4 portrait; margin: 0; }';
-  }
-
-  function waitForImage(img, timeoutMs) {
-    return new Promise(function (resolve) {
-      if (!img || img.complete) {
-        resolve();
-        return;
-      }
-      let finished = false;
-      function finish() {
-        if (finished) return;
-        finished = true;
-        img.removeEventListener('load', finish);
-        img.removeEventListener('error', finish);
-        resolve();
-      }
-      img.addEventListener('load', finish);
-      img.addEventListener('error', finish);
-      setTimeout(finish, timeoutMs || 4000);
-    });
-  }
-
-  async function finalizePrintWindow(win, fileName) {
-    if (!win || win.closed) return;
-    const doc = win.document;
-    const printButton = doc.getElementById('studocudown-print');
-    const closeButton = doc.getElementById('studocudown-close');
-    const name = SH.buildFileName(fileName || doc.title);
-
-    // Chrome reads the print window's title when the preview opens, so keep it
-    // set right before every print, including a manual Ctrl+P.
-    function assertTitle() {
-      try {
-        if (doc.title !== name) doc.title = name;
-      } catch (error) {
-        // The window may be closing.
-      }
-    }
-    assertTitle();
-    try {
-      win.addEventListener('beforeprint', assertTitle);
-    } catch (error) {
-      // Ignore cross-window failures; the title is already set.
-    }
-
-    if (printButton) {
-      printButton.addEventListener('click', function () {
-        assertTitle();
-        setTimeout(function () {
-          try { win.print(); } catch (error) { /* window may be closed */ }
-        }, 150);
-      });
-    }
-    if (closeButton) {
-      closeButton.addEventListener('click', function () {
-        try { win.close(); } catch (error) { /* ignore */ }
-      });
-    }
-
-    try {
-      if (doc.fonts && doc.fonts.ready) {
-        await Promise.race([doc.fonts.ready, SH.sleep(4000)]);
-      }
-    } catch (error) {
-      // Font loading is best-effort.
-    }
-
-    const images = Array.prototype.slice.call(doc.images || []);
-    await Promise.all(images.map(function (img) {
-      return waitForImage(img, 4000);
-    }));
-
-    // Fallback DOM may contain a blurred preview whose clear sibling is not
-    // available. Hide the broken/blurred image and label the page instead of
-    // silently printing a blurred sheet.
-    images.forEach(function (img) {
-      if (!img.getAttribute('data-studocudown-original')) return;
-      if (img.complete && img.naturalWidth > 0) return;
-      img.style.setProperty('display', 'none', 'important');
-      const page = img.closest('.pf');
-      if (page && !page.querySelector('.studocudown-gated-note')) {
-        const note = doc.createElement('div');
-        note.className = 'studocudown-gated-note';
-        note.textContent = 'Preview only — the clear image is not available.';
-        page.appendChild(note);
-      }
-    });
-
-    try {
-      applyPageSizes(win);
-    } catch (error) {
-      SH.warn('Could not apply page sizes', error);
-    }
-
-    assertTitle();
-    if (printButton) printButton.disabled = false;
-    try { win.focus(); } catch (error) { /* ignore */ }
-    // The print dialog is never opened automatically: the user starts printing
-    // with the "Print / Save as PDF" button in the preview toolbar.
   }
 
   function fail(win, message) {
     SH.warn(message);
     SH.ui.setState('error', message);
     SH.ui.toast(message, 'error');
-    if (!win || win.closed) return;
-    try {
-      win.document.open();
-      win.document.write(
-        '<!doctype html><html><head><meta charset="utf-8"><title>StudocuDown</title>' +
-        '<style>body{margin:0;padding:24px;background:#fff;color:#111;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}' +
-        'h1{margin:0 0 8px;font-size:18px}p{margin:0;color:#b91c1c}</style></head><body>' +
-        '<h1>StudocuDown</h1><p></p></body></html>'
-      );
-      win.document.close();
-      const paragraph = win.document.querySelector('p');
-      if (paragraph) paragraph.textContent = message;
-    } catch (error) {
-      // The tab may already be closed.
-    }
+    SH.ui.showPrintError(win, message);
   }
 
   download.start = async function () {

@@ -24,8 +24,8 @@ the `skill` tool before acting.
 Run these before reporting completion:
 
 ```powershell
-Get-ChildItem content\*.js, background.js | ForEach-Object { node --check $_.FullName }
-node --test test/core.test.mjs test/background.test.mjs
+Get-ChildItem content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
+node --test test/core.test.mjs test/background.test.mjs test/print.test.mjs
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ```
 

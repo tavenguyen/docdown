@@ -22,6 +22,18 @@
     "service_worker": "background.js"
   },
 
+  "web_accessible_resources": [
+    {
+      "resources": ["print.html"],
+      "matches": [
+        "https://*.studocu.com/*",
+        "https://*.studocu.vn/*",
+        "https://*.studocu.id/*",
+        "https://*.studeersnel.nl/*"
+      ]
+    }
+  ],
+
   "content_scripts": [
     {
       "matches": [

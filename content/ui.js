@@ -265,44 +265,112 @@
     }, 6000);
   };
 
+  ui.printPageUrl = function () {
+    try {
+      return chrome.runtime.getURL('print.html');
+    } catch (error) {
+      return '';
+    }
+  };
+
+  ui.printPageOrigin = function () {
+    const url = ui.printPageUrl();
+    if (!url) return '';
+    try {
+      return new URL(url).origin;
+    } catch (error) {
+      return '';
+    }
+  };
+
   ui.openPrintWindow = function () {
     // Must be called synchronously from the click handler to avoid popup blocking.
-    const win = window.open('', '_blank');
-    if (!win) return null;
+    const url = ui.printPageUrl();
+    if (!url) return null;
     try {
-      win.document.open();
-      win.document.write(
-        '<!doctype html><html><head><meta charset="utf-8"><title>StudocuDown — preparing document…</title>' +
-        '<style>body{margin:0;padding:32px;background:#f3f4f6;color:#111;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}' +
-        'h1{margin:0 0 8px;font-size:18px}p{margin:0;color:#555}</style></head><body>' +
-        '<h1>StudocuDown</h1><p>Đang quét tài liệu…</p></body></html>'
-      );
-      win.document.close();
+      return window.open(url, '_blank');
     } catch (error) {
-      // The window exists but may not be writable yet; the caller will retry.
-    }
-    return win;
-  };
-
-  ui.writePrintWindow = function (win, html) {
-    if (!win || win.closed) return false;
-    try {
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
-      return true;
-    } catch (error) {
-      return false;
+      return null;
     }
   };
 
-  // Chrome suggests the print window's document title as the PDF file name.
-  ui.setPrintTitle = function (win, name) {
+  // The preview is an extension page, so it is cross-origin to the Studocu tab
+  // and receives the document through postMessage.
+  ui.deliverPrintDocument = function (win, html, fileName) {
+    return new Promise(function (resolve) {
+      if (!win || win.closed) {
+        resolve(false);
+        return;
+      }
+      const origin = ui.printPageOrigin();
+      const timeoutMs = 20000;
+      let finished = false;
+      let sent = false;
+      let deadline = 0;
+      let pinger = 0;
+
+      function finish(ok) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(deadline);
+        clearInterval(pinger);
+        window.removeEventListener('message', onMessage);
+        resolve(ok);
+      }
+
+      function sendDocument() {
+        if (sent || finished) return;
+        sent = true;
+        clearInterval(pinger);
+        try {
+          win.postMessage({
+            type: 'studocudown-print-doc',
+            html: html,
+            fileName: fileName
+          }, origin);
+        } catch (error) {
+          finish(false);
+        }
+      }
+
+      function onMessage(event) {
+        if (event.source !== win) return;
+        if (origin && event.origin !== origin) return;
+        const data = event.data || {};
+        if (data.type === 'studocudown-print-ready') sendDocument();
+        else if (data.type === 'studocudown-print-rendered') finish(true);
+        else if (data.type === 'studocudown-print-failed') finish(false);
+      }
+
+      function ping() {
+        if (finished) return;
+        if (win.closed) {
+          finish(false);
+          return;
+        }
+        try {
+          win.postMessage({ type: 'studocudown-print-ping' }, origin);
+        } catch (error) {
+          finish(false);
+        }
+      }
+
+      window.addEventListener('message', onMessage);
+      ping();
+      pinger = setInterval(ping, 300);
+      deadline = setTimeout(function () { finish(false); }, timeoutMs);
+    });
+  };
+
+  ui.showPrintError = function (win, message) {
     if (!win || win.closed) return;
     try {
-      win.document.title = String(name || '');
+      win.postMessage({
+        type: 'studocudown-print-error',
+        message: String(message || '')
+      }, ui.printPageOrigin());
     } catch (error) {
-      // The window may be closing; the title written in the HTML still applies.
+      // The tab may already be closed.
     }
   };
 

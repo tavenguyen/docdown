@@ -364,6 +364,26 @@ test('buildPrintHtml shows the PDF file name in the preview toolbar', () => {
   assert.match(html, /<title>Đề Cương/);
 });
 
+test('isAllowedPrintOrigin accepts only the four Studocu domains', () => {
+  assert.equal(SH.isAllowedPrintOrigin('https://www.studocu.vn'), true);
+  assert.equal(SH.isAllowedPrintOrigin('https://studocu.com'), true);
+  assert.equal(SH.isAllowedPrintOrigin('https://www.studocu.id'), true);
+  assert.equal(SH.isAllowedPrintOrigin('https://www.studeersnel.nl'), true);
+  assert.equal(SH.isAllowedPrintOrigin('https://studocu.com.evil.test'), false);
+  assert.equal(SH.isAllowedPrintOrigin('http://www.studocu.vn'), false);
+  assert.equal(SH.isAllowedPrintOrigin('chrome-extension://abc'), false);
+  assert.equal(SH.isAllowedPrintOrigin(''), false);
+});
+
+test('stripScriptTags removes script blocks before printing', () => {
+  assert.equal(
+    SH.stripScriptTags('<p>a</p><script>alert(1)</script><p>b</p>'),
+    '<p>a</p><p>b</p>'
+  );
+  assert.equal(SH.stripScriptTags('<script src="x"></script>ok'), 'ok');
+  assert.equal(SH.stripScriptTags(''), '');
+});
+
 test('mapLimit preserves order and respects the concurrency limit', async () => {
   let active = 0;
   let maxActive = 0;

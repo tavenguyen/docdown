@@ -204,7 +204,6 @@
   SH.escapeAttr = SH.escapeHtml;
 
   SH.FILE_NAME_LIMIT = 120;
-
   // Chrome uses the print window's document.title as the default PDF file
   // name, so it must be a legal and reasonably short file name.
   SH.buildFileName = function (title, fallback) {
@@ -220,6 +219,19 @@
       name = chars.slice(0, SH.FILE_NAME_LIMIT).join('').trim();
     }
     return name;
+  };
+
+  // The print preview runs on a chrome-extension:// page, so it only accepts
+  // documents posted by the Studocu pages that opened it.
+  SH.isAllowedPrintOrigin = function (origin) {
+    return /^https:\/\/(?:[a-z0-9-]+\.)*(?:studocu\.(?:com|vn|id)|studeersnel\.nl)$/i
+      .test(String(origin || ''));
+  };
+
+  // Defense in depth: the generated print document has no scripts, and the
+  // extension page CSP blocks inline ones, but never write them at all.
+  SH.stripScriptTags = function (html) {
+    return String(html || '').replace(/<script\b[\s\S]*?<\/script\s*>/gi, '');
   };
 
   SH.stripBlurClasses = function (el) {

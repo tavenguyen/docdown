@@ -115,13 +115,16 @@ back to cloning the pages currently rendered in the viewer.
 - Fetched page HTML is sanitised: scripts, iframes, event handlers, and
   `javascript:` URLs are removed.
 - The extension sends nothing to a third-party server.
-- The print document is built in a same-origin `about:blank` tab and is never
-  uploaded.
+- The print preview is an extension page (`print.html`), exposed only to the four
+  Studocu domains. It accepts a document only from the Studocu page that opened
+  it and strips any `<script>` before writing it.
 
 ## Development
 
 ```text
 background.js  service worker: validated reset request -> cookies + browsingData
+print.html     print preview page, served from the extension origin
+print.js       preview rendering, printing and page sizing
 content/
   core.js      shared namespace, metadata parsing, URL builders, sanitising, fetch
   ui.js        floating buttons (download, reset session), panel, toast, print window
@@ -131,6 +134,7 @@ style.css      extension UI and no-filter overrides
 test/
   core.test.mjs
   background.test.mjs
+  print.test.mjs
 ```
 
 Run the tests:
