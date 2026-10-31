@@ -334,6 +334,29 @@ test('requestFullReset falls back when the worker refuses', async () => {
   assert.equal(localStore.cleared, true);
 });
 
+test('buildFileName keeps a normal Vietnamese document title intact', () => {
+  const title = 'Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227';
+  assert.equal(SH.buildFileName(title), title);
+});
+
+test('buildFileName strips the Studocu site suffix', () => {
+  assert.equal(SH.buildFileName('Bài giảng | Studocu'), 'Bài giảng');
+  assert.equal(SH.buildFileName('Bài giảng - Studocu'), 'Bài giảng');
+  assert.equal(SH.buildFileName('College - Studeersnel'), 'College');
+});
+
+test('buildFileName replaces illegal file name characters', () => {
+  assert.equal(SH.buildFileName('a/b:c*d?"e"<f>|g'), 'a b c d e f g');
+  assert.equal(SH.buildFileName('  nhiều    khoảng trắng  '), 'nhiều khoảng trắng');
+});
+
+test('buildFileName limits length and falls back when empty', () => {
+  assert.equal(SH.buildFileName('x'.repeat(300)).length, 120);
+  assert.equal(SH.buildFileName(''), 'document');
+  assert.equal(SH.buildFileName(null), 'document');
+  assert.equal(SH.buildFileName('***'), 'document');
+});
+
 test('mapLimit preserves order and respects the concurrency limit', async () => {
   let active = 0;
   let maxActive = 0;

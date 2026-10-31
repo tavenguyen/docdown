@@ -296,6 +296,16 @@
     }
   };
 
+  // Chrome suggests the print window's document title as the PDF file name.
+  ui.setPrintTitle = function (win, name) {
+    if (!win || win.closed) return;
+    try {
+      win.document.title = String(name || '');
+    } catch (error) {
+      // The window may be closing; the title written in the HTML still applies.
+    }
+  };
+
   ui.cleanup = function () {
     clearTimeout(state.toastTimer);
     clearTimeout(state.panelTimer);

@@ -203,6 +203,25 @@
   };
   SH.escapeAttr = SH.escapeHtml;
 
+  SH.FILE_NAME_LIMIT = 120;
+
+  // Chrome uses the print window's document.title as the default PDF file
+  // name, so it must be a legal and reasonably short file name.
+  SH.buildFileName = function (title, fallback) {
+    let name = String(title === undefined || title === null ? '' : title);
+    name = name.replace(/\s*[|\u2013\u2014-]\s*(studocu|studeersnel)\s*$/i, '');
+    name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ');
+    name = name.replace(/\s+/g, ' ').trim();
+    name = name.replace(/^[.\s]+/, '').replace(/[.\s]+$/, '');
+    if (!name) name = String(fallback || 'document');
+
+    const chars = Array.from(name);
+    if (chars.length > SH.FILE_NAME_LIMIT) {
+      name = chars.slice(0, SH.FILE_NAME_LIMIT).join('').trim();
+    }
+    return name;
+  };
+
   SH.stripBlurClasses = function (el) {
     if (!el || !el.classList) return;
     Array.prototype.slice.call(el.classList).forEach(function (name) {

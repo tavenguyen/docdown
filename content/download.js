@@ -177,6 +177,7 @@
     if (!SH.ui.writePrintWindow(win, html)) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
+    SH.ui.setPrintTitle(win, SH.buildFileName(meta.title));
     await finalizePrintWindow(win);
     SH.ui.progress(results.length, results.length, 'Sẵn sàng in');
     let status = 'Đã tạo bản in (' + results.length + ' trang';
@@ -224,6 +225,7 @@
     if (!SH.ui.writePrintWindow(win, html)) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
+    SH.ui.setPrintTitle(win, SH.buildFileName(SH.getTitle()));
     await finalizePrintWindow(win);
     SH.ui.setState('ready', 'Đã tạo bản in từ DOM (' + total + ' trang)');
   }
@@ -334,17 +336,8 @@
 
     if (printButton) printButton.disabled = false;
     try { win.focus(); } catch (error) { /* ignore */ }
-
-    // Debug/test hook: set data-studocudown-no-autoprint on <html> to keep the
-    // preview open without opening the browser print dialog.
-    const autoPrint = !document.documentElement.hasAttribute('data-studocudown-no-autoprint');
-    if (autoPrint) {
-      setTimeout(function () {
-        if (!win.closed) {
-          try { win.print(); } catch (error) { /* user can click the button */ }
-        }
-      }, 800);
-    }
+    // The print dialog is never opened automatically: the user starts printing
+    // with the "Print / Save as PDF" button in the preview toolbar.
   }
 
   function fail(win, message) {

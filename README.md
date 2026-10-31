@@ -44,8 +44,10 @@ to a first-visit state.
 4. StudocuDown scans the document and opens a new tab with the assembled pages.
 5. In the print dialog, choose **Save as PDF**.
 
-The print tab also has a **Print / Save as PDF** button if the dialog does not
-open automatically.
+The print tab never opens the browser print dialog by itself. When you are ready,
+click **Print / Save as PDF**; Chrome suggests the document title as the PDF file
+name (for example
+`Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227.pdf`).
 
 ### Reset phiên
 
