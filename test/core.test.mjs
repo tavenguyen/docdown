@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import zlib from 'node:zlib';
 
 const APP_SOURCES = [
   '../lib/core.js',
@@ -31,6 +32,9 @@ function loadCore(overrides) {
     AbortController,
     FileReader: class {},
     DOMParser: class {},
+    Blob,
+    Response,
+    DecompressionStream,
     setTimeout,
     clearTimeout,
     Promise
@@ -417,10 +421,19 @@ test('buildFileName strips the TaiLieu.VN site suffix', () => {
   assert.equal(SH.buildFileName('Bài giảng - tailieu.vn'), 'Bài giảng');
 });
 
-test('countPdfPages reads the page tree count and ignores missing data', () => {
-  const bytes = new TextEncoder().encode('%PDF-1.6\n1 0 obj << /Type /Pages /Count 53 >> endobj\n%%EOF');
-  assert.equal(SH.countPdfPages(bytes), 53);
-  assert.equal(SH.countPdfPages(new Uint8Array(0)), null);
+test('countPdfPages reads plain and compressed page trees', async () => {
+  const plain = new TextEncoder().encode('%PDF-1.6\n1 0 obj << /Type /Pages /Count 53 >> endobj');
+  assert.equal(await SH.countPdfPages(plain), 53);
+
+  const inner = Buffer.from('1 0 obj << /Type /Pages /Count 42 >> endobj');
+  const compressed = Buffer.concat([
+    Buffer.from('%PDF-1.6\n1 0 obj << /Type /ObjStm /Filter /FlateDecode >>\nstream\n'),
+    zlib.deflateSync(inner),
+    Buffer.from('\nendstream\nendobj\n')
+  ]);
+  assert.equal(await SH.countPdfPages(new Uint8Array(compressed)), 42);
+
+  assert.equal(await SH.countPdfPages(new Uint8Array(0)), null);
 });
 
 test('assetAllowed accepts only the registered provider asset hosts', () => {

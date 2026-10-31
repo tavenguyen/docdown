@@ -226,7 +226,7 @@
       let pages = null;
       if (blob.size <= COUNT_LIMIT_BYTES) {
         try {
-          pages = DD.countPdfPages(await blob.arrayBuffer());
+          pages = await DD.countPdfPages(await blob.arrayBuffer());
         } catch (error) {
           pages = null;
         }
