@@ -1,0 +1,213 @@
+.studocudown-nofilter {
+  filter: none !important;
+  -webkit-filter: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+.studocudown-fab-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+#studocudown-download-button.studocudown-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: #16a34a;
+  color: #fff;
+  padding: 11px 16px;
+  font: 700 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+#studocudown-download-button.studocudown-fab:hover {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+#studocudown-download-button.studocudown-fab:focus-visible {
+  outline: 3px solid #bbf7d0;
+  outline-offset: 2px;
+}
+
+#studocudown-download-button.studocudown-fab:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+#studocudown-download-button.studocudown-fab svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+#studocudown-reset-button.studocudown-fab-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 9999px;
+  background: #374151;
+  color: #fff;
+  padding: 8px 13px;
+  font: 600 12px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+#studocudown-reset-button.studocudown-fab-reset:hover {
+  background: #1f2937;
+}
+
+#studocudown-reset-button.studocudown-fab-reset:focus-visible {
+  outline: 3px solid #e5e7eb;
+  outline-offset: 2px;
+}
+
+#studocudown-reset-button.studocudown-fab-reset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#studocudown-reset-button.studocudown-fab-reset.studocudown-reset-armed {
+  background: #b91c1c;
+}
+
+#studocudown-reset-button.studocudown-fab-reset.studocudown-reset-armed:hover {
+  background: #991b1b;
+}
+
+#studocudown-reset-button.studocudown-fab-reset svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+#studocudown-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 124px;
+  z-index: 2147483646;
+  width: min(320px, calc(100vw - 40px));
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#studocudown-panel[hidden] {
+  display: none;
+}
+
+#studocudown-panel.studocudown-panel-error {
+  border: 1px solid #ef4444;
+}
+
+#studocudown-panel.studocudown-panel-ready {
+  border: 1px solid #22c55e;
+}
+
+.studocudown-panel-text {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.studocudown-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.studocudown-progress > i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #22c55e;
+  transition: width 0.2s ease;
+}
+
+#studocudown-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 148px;
+  z-index: 2147483647;
+  max-width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  font: 600 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#studocudown-toast.studocudown-toast-error {
+  background: #991b1b;
+}
+
+#studocudown-toast.studocudown-toast-hide {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}
+
+@media (max-width: 600px) {
+  .studocudown-fab-stack {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  #studocudown-download-button.studocudown-fab {
+    padding: 12px;
+    border-radius: 9999px;
+  }
+
+  #studocudown-download-button.studocudown-fab .studocudown-label {
+    display: none;
+  }
+
+  #studocudown-reset-button.studocudown-fab-reset {
+    padding: 9px 11px;
+  }
+
+  #studocudown-panel {
+    right: 12px;
+    bottom: 116px;
+    width: calc(100vw - 24px);
+  }
+
+  #studocudown-toast {
+    bottom: 140px;
+  }
+}
+
+@media print {
+  .studocudown-fab-stack,
+  #studocudown-download-button,
+  #studocudown-reset-button,
+  #studocudown-panel,
+  #studocudown-toast {
+    display: none !important;
+  }
+}

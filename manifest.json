@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+
+  "name": "StudocuDown",
+  "version": "1.0.0",
+  "description": "Download Studocu documents as PDF, remove banners and blur where possible",
+  "author": "StudocuDown",
+  "icons": {
+    "128": "img/icon.png"
+  },
+
+  "permissions": ["cookies", "browsingData"],
+
+  "host_permissions": [
+    "https://*.studocu.com/*",
+    "https://*.studocu.vn/*",
+    "https://*.studocu.id/*",
+    "https://*.studeersnel.nl/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.studocu.com/*",
+        "https://*.studocu.vn/*",
+        "https://*.studocu.id/*",
+        "https://*.studeersnel.nl/*"
+      ],
+      "js": [
+        "content/core.js",
+        "content/ui.js",
+        "content/pages.js",
+        "content/download.js"
+      ],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
