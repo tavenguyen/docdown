@@ -11,6 +11,8 @@ Location: `.opencode/skills/`
 |---|---|---|---|
 | [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) | `8bfcc1f9916f2eea55494d8c1fa7f4bde867dd9e` | MIT | `planning-and-task-breakdown`, `incremental-implementation`, `test-driven-development`, `debugging-and-error-recovery`, `code-review-and-quality`, `security-and-hardening`, `performance-optimization`, `code-simplification` |
 | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) | `4f2b13e25c5815b3f080ca0d983e828d96561a0f` | Apache-2.0 | `chrome-extensions` |
+| [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | `8909f6af8806897cbb8330c11028eee168ad7cc7` | MIT (repo LICENSE is a scope note; `skills/` is not in the BSL list) | `caveman-commit` |
+| [blader/humanizer](https://github.com/blader/humanizer) | `d4b81278e6604e237bf32f0f7ce5c217aee94269` | MIT | `humanizer` |
 
 Shared checklists: `.opencode/references/` (from `addyosmani/agent-skills`).
 License texts: `.opencode/licenses/`.
