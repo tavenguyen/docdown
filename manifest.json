@@ -31,7 +31,7 @@
         "https://*.studocu.vn/*",
         "https://*.studocu.id/*",
         "https://*.studeersnel.nl/*",
-        "https://tailieu.vn/doc/*"
+        "https://tailieu.vn/*"
       ]
     }
   ],

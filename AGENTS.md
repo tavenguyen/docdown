@@ -26,7 +26,7 @@ Run these before reporting completion:
 
 ```powershell
 Get-ChildItem lib\*.js, providers\*.js, content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
-node --test test/core.test.mjs test/tailieu.test.mjs test/background.test.mjs test/print.test.mjs
+node --test test/core.test.mjs test/tailieu.test.mjs test/manifest.test.mjs test/background.test.mjs test/print.test.mjs
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ```
 
