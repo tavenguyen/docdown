@@ -89,9 +89,12 @@ white page with a note instead of a broken image.
 
 Course Hero only sends the preview pages to visitors who are not signed in
 (usually 2 of 8), and its background images are already redacted on the server.
-DocDown keeps the readable text layer, drops the blurred artwork, and never
-invents the pages the site did not send. Sign in with access to get more pages
-rendered in the viewer.
+DocDown keeps the readable text layer, drops the blurred artwork, and adds a
+note page with a link to Course Hero's own unlock page; it never invents the
+pages the site did not send.
+
+When your account can view every page, the viewer renders them with clear
+backgrounds and DocDown prints the full document instead of the preview.
 
 ### Reset phiên
 

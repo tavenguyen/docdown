@@ -21,6 +21,24 @@
     }
   }
 
+  // The inline literal is sometimes double-escaped depending on how the page
+  // was rendered, so try the raw string and the unescaped variants.
+  function parseProps(body) {
+    const attempts = [
+      body,
+      body.replace(/\\"/g, '"'),
+      body.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    ];
+    for (let i = 0; i < attempts.length; i++) {
+      try {
+        return JSON.parse(attempts[i]);
+      } catch (error) {
+        // Try the next shape.
+      }
+    }
+    return null;
+  }
+
   // Course Hero serialises its page props as an escaped object literal inside
   // an inline script. Unescape the quotes and parse it; never execute it.
   function decodePayload(source) {
@@ -31,9 +49,9 @@
     const end = text.indexOf('</script>', marker);
     if (eq === -1 || end === -1 || end <= eq) return null;
 
-    const body = text.slice(eq + 1, end).trim().replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    const body = text.slice(eq + 1, end).trim();
     try {
-      const data = JSON.parse(body);
+      const data = parseProps(body);
       if (!data || typeof data !== 'object') return null;
       const values = Object.keys(data).map(function (key) { return data[key]; });
       for (let i = 0; i < values.length; i++) {
@@ -68,28 +86,52 @@
     return /\/blur\//i.test(String(url || ''));
   }
 
-  function isAllowedAssetUrl(url) {
-    if (!url) return false;
+  function absoluteAssetUrl(url) {
+    if (!url) return '';
     try {
-      const parsed = new URL(url, (globalThis.location && globalThis.location.href) || undefined);
-      if (parsed.protocol !== 'https:') return false;
-      if (parsed.hostname.toLowerCase() !== 'www.coursehero.com') return false;
-      if (parsed.pathname.indexOf('..') !== -1) return false;
-      if (!/^\/asset\/bg\/[a-f0-9]+\//i.test(parsed.pathname)) return false;
-      return !isBlurredUrl(parsed.pathname);
+      const parsed = new URL(String(url), 'https://www.coursehero.com/');
+      if (parsed.protocol !== 'https:') return '';
+      if (parsed.hostname.toLowerCase() !== 'www.coursehero.com') return '';
+      if (parsed.pathname.indexOf('..') !== -1) return '';
+      if (!/^\/asset\/bg\/[a-f0-9]+\//i.test(parsed.pathname)) return '';
+      if (isBlurredUrl(parsed.pathname)) return '';
+      return parsed.href;
     } catch (error) {
-      return false;
+      return '';
     }
   }
 
+  function isAllowedAssetUrl(url) {
+    return !!absoluteAssetUrl(url);
+  }
+
+  // Rewrites every url() in a stylesheet: blurred artwork is dropped, clear
+  // Course Hero assets become absolute (the print page is a chrome-extension
+  // origin, so a relative path would 404), everything else is neutralised.
+  function rewriteCssUrls(css) {
+    return String(css || '').replace(/url\((['"]?)([^)'"]+)\1\)/gi, function (full, quote, url) {
+      if (isBlurredUrl(url)) return 'none';
+      const absolute = absoluteAssetUrl(url);
+      return absolute ? 'url("' + absolute + '")' : 'none';
+    });
+  }
+
   function safeCss(css) {
-    const text = String(css || '');
-    if (isBlurredUrl(text)) return '';
-    return text
+    return rewriteCssUrls(css)
       .replace(/@import[^;]*;/gi, '')
       .replace(/expression\s*\(/gi, '')
-      .replace(/javascript\s*:/gi, '')
-      .replace(/url\s*\([^)]*\)/gi, 'none');
+      .replace(/javascript\s*:/gi, '');
+  }
+
+  function classifyAccess(captured, total) {
+    if (!total) return 'preview';
+    return captured >= total ? 'full' : 'preview';
+  }
+
+  function safeUnlockUrl(url) {
+    const value = String(url || '');
+    if (!/^\/unlock-document\/\d+\//.test(value)) return '';
+    return 'https://www.coursehero.com' + value;
   }
 
   // Cleans one rendered page: keeps the text layer and its generated styles,
@@ -107,7 +149,29 @@
       else style.textContent = css;
     });
 
+    clone.querySelectorAll('img').forEach(function (img) {
+      const raw = img.getAttribute('src') || img.getAttribute('data-src') ||
+        img.getAttribute('orig') || '';
+      const absolute = absoluteAssetUrl(raw);
+      const keep = ['class', 'style', 'width', 'height'];
+      Array.prototype.slice.call(img.attributes).forEach(function (attr) {
+        if (keep.indexOf(attr.name.toLowerCase()) === -1) img.removeAttribute(attr.name);
+      });
+      if (img.getAttribute('style')) {
+        img.setAttribute('style', rewriteCssUrls(img.getAttribute('style')));
+      }
+      if (!absolute) {
+        img.remove();
+        return;
+      }
+      img.setAttribute('src', absolute);
+      img.setAttribute('alt', '');
+      img.setAttribute('loading', 'eager');
+      img.setAttribute('decoding', 'sync');
+    });
+
     clone.querySelectorAll('*').forEach(function (el) {
+      if (el.tagName === 'IMG') return;
       Array.prototype.slice.call(el.attributes).forEach(function (attr) {
         const name = attr.name.toLowerCase();
         const value = String(attr.value || '');
@@ -115,27 +179,32 @@
           el.removeAttribute(attr.name);
           return;
         }
-        if (isBlurredUrl(value)) {
-          // Covers style, src, data-background-image and the JSON bookkeeping
-          // attributes (data-props, data-originaltag) that embed the URL.
+        // Bookkeeping attributes carry the original URLs (including blurred
+        // ones) and are not needed to render the page.
+        if (name === 'data-props' || name === 'data-originaltag' ||
+          name === 'data-background-image' || name === 'data-background') {
           el.removeAttribute(attr.name);
           return;
         }
-        if (name === 'style' && /javascript\s*:/i.test(value)) {
+        if (name === 'style') {
+          const rewritten = rewriteCssUrls(value).replace(/javascript\s*:/gi, '');
+          if (rewritten !== value) el.setAttribute('style', rewritten);
+          return;
+        }
+        if (name === 'src' || name === 'srcset') {
           el.removeAttribute(attr.name);
           return;
         }
-        if ((name === 'href' || name === 'src') && /^\s*(javascript|vbscript):/i.test(value)) {
-          el.removeAttribute(attr.name);
+        if (name === 'href') {
+          if (!/^https?:/i.test(value)) el.removeAttribute(attr.name);
+          return;
         }
+        if (isBlurredUrl(value)) el.removeAttribute(attr.name);
       });
-      if (el.tagName === 'IMG' && !el.getAttribute('src')) {
-        el.remove();
-        return;
-      }
+
       if (el.classList) {
         Array.prototype.slice.call(el.classList).forEach(function (token) {
-          if (/blur|paywall|unlock/i.test(token)) el.classList.remove(token);
+          if (/paywall|unlock/i.test(token)) el.classList.remove(token);
         });
       }
       const testId = String(el.getAttribute('data-testid') || '');
@@ -181,13 +250,18 @@
       page.html + '</div></div>';
   }
 
-  function notePageHtml(width, height, total, missing) {
+  function notePageHtml(width, height, total, missing, unlockUrl) {
+    const link = safeUnlockUrl(unlockUrl);
+    const action = link
+      ? '<div class="docdown-gated-text"><a href="' + DD.escapeAttr(link) +
+        '" target="_blank" rel="noopener">Mở khóa trên Course Hero</a></div>'
+      : '';
     return '<div class="pf docdown-ch-page" style="width:' + width + 'px;height:' + height + 'px">' +
       '<div class="docdown-gated-page">' +
       '<div class="docdown-gated-title">Bản xem trước</div>' +
       '<div class="docdown-gated-text">Course Hero chỉ gửi ' + (total - missing) + '/' + total +
-      ' trang cho khách. ' + missing + ' trang còn lại cần tài khoản hoặc lượt mở khóa, nên ' +
-      'DocDown không dựng chúng.</div></div></div>';
+      ' trang cho tài khoản này. ' + missing + ' trang còn lại cần tài khoản hoặc lượt mở khóa, ' +
+      'nên DocDown không dựng chúng.</div>' + action + '</div></div>';
   }
 
   function buildCss() {
@@ -231,11 +305,13 @@
       }
 
       const total = state.info ? state.info.pageCount : state.pages.length;
+      const mode = classifyAccess(state.pages.length, total);
       const pagesHtml = state.pages.map(pageHtml).join('');
       const missing = Math.max(0, total - state.pages.length);
       const last = state.pages[state.pages.length - 1];
-      const note = missing
-        ? notePageHtml(last.width, last.height, total, missing)
+      const note = mode === 'preview' && missing
+        ? notePageHtml(last.width, last.height, total, missing,
+          state.info ? state.info.unlockUrl : '')
         : '';
 
       const html = DD.buildPrintHtml({
@@ -252,8 +328,11 @@
         throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
       }
 
-      const status = 'Đã tạo bản xem trước (' + state.pages.length + '/' + total +
-        ' trang' + (missing ? ', ' + missing + ' trang còn khóa' : '') + ')';
+      const status = mode === 'full'
+        ? 'Đã tạo bản in đầy đủ (' + state.pages.length + ' trang)'
+        : 'Đã tạo bản xem trước (' + state.pages.length + '/' + total +
+          ' trang' + (missing ? ', ' + missing + ' trang còn khóa' : '') +
+          ') — bản đầy đủ cần tài khoản';
       DD.ui.progress(1, 1, status);
       DD.ui.setState('ready', status);
     } catch (error) {
@@ -281,6 +360,12 @@
     decodePayload: decodePayload,
     readInfo: readInfo,
     isBlurredUrl: isBlurredUrl,
+    absoluteAssetUrl: absoluteAssetUrl,
+    rewriteCssUrls: rewriteCssUrls,
+    classifyAccess: classifyAccess,
+    safeUnlockUrl: safeUnlockUrl,
+    capturePages: capturePages,
+    preparePage: preparePage,
     pageHtml: pageHtml,
     notePageHtml: notePageHtml,
     buildCss: buildCss,

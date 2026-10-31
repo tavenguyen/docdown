@@ -118,6 +118,31 @@ test('blurred artwork is detected and never allowed', () => {
   assert.equal(provider.isAllowedAssetUrl('https://www.coursehero.com/asset/bg/' + HASH + '/../../x.webp'), false);
 });
 
+test('clear assets are rewritten to absolute URLs for the print page', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const clear = '/asset/bg/' + HASH + '/splits/page-1-html-bg-abc.webp';
+  const blurred = '/asset/bg/blur/' + HASH + '/splits/page-1-html-bg-abc.webp';
+
+  assert.equal(provider.absoluteAssetUrl(clear), 'https://www.coursehero.com' + clear);
+  assert.equal(provider.absoluteAssetUrl(blurred), '');
+  assert.equal(provider.absoluteAssetUrl('https://evil.test/asset/bg/' + HASH + '/x.webp'), '');
+
+  const css = provider.rewriteCssUrls(
+    '.a{background:url(' + clear + ')}.b{background:url(' + blurred + ')}.c{background:url(https://evil.test/x.png)}'
+  );
+  assert.ok(css.includes('url("https://www.coursehero.com' + clear + '")'), 'clear artwork stays');
+  assert.equal((css.match(/none/g) || []).length, 2, 'blurred and foreign URLs are neutralised');
+});
+
+test('access is full only when every page was rendered', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  assert.equal(provider.classifyAccess(2, 8), 'preview');
+  assert.equal(provider.classifyAccess(8, 8), 'full');
+  assert.equal(provider.classifyAccess(0, 8), 'preview');
+});
+
 test('pageHtml wraps the rendered page at the normalised width', () => {
   const DD = loadCourseHero();
   const provider = DD.providerById('coursehero');
@@ -147,6 +172,24 @@ test('the preview note states how many pages are missing', () => {
   assert.match(html, /Bản xem trước/);
   assert.match(html, /2\/8 trang/);
   assert.match(html, /6 trang còn lại/);
+});
+
+test('the preview note links to the official unlock page only when it is valid', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+
+  assert.equal(provider.safeUnlockUrl('/unlock-document/256415136/x/'),
+    'https://www.coursehero.com/unlock-document/256415136/x/');
+  assert.equal(provider.safeUnlockUrl('https://evil.test/x'), '');
+  assert.equal(provider.safeUnlockUrl(''), '');
+
+  const html = provider.notePageHtml(1000, 774, 8, 6, '/unlock-document/256415136/x/');
+  assert.ok(html.includes('href="https://www.coursehero.com/unlock-document/256415136/x/"'));
+  assert.ok(html.includes('rel="noopener"'));
+  assert.ok(html.includes('Mở khóa trên Course Hero'));
+
+  const without = provider.notePageHtml(1000, 774, 8, 6, 'javascript:alert(1)');
+  assert.ok(!without.includes('href='), 'an invalid unlock URL must not be linked');
 });
 
 test('buildCss keeps the page box hidden and white', () => {

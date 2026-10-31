@@ -69,7 +69,8 @@ For the browser path, load the unpacked extension and test:
     (displayed with `<img>` only: the CDN sends no CORS headers);
   - Course Hero pages are read from the rendered DOM; only clear
     `https://www.coursehero.com/asset/bg/<hash>/…` artwork may be embedded, never
-    a `/blur/` path.
+    a `/blur/` path. Do not strip CSS blur classes or filters: a page counts as
+    readable only when the server already sent the clear content.
 - Validate every fetched URL: HTTPS, allowlisted host, no path traversal, and
   the expected file type before saving.
 - Sanitize fetched page HTML: remove `script`, `iframe`, `object`, `embed`,
