@@ -1,4 +1,4 @@
-# Agent Rules — StudocuDown
+# Agent Rules — DocDown
 
 ## Skills
 
@@ -14,7 +14,8 @@ the `skill` tool before acting.
 
 ## Non-negotiable
 
-- Do not claim work is complete without evidence: tests, syntax checks, JSON validation, or documented browser verification.
+- Do not claim work is complete without evidence: tests, syntax checks, JSON
+  validation, or documented browser verification.
 - Read the existing code before changing it. Do not delete unfamiliar work.
 - Prefer the smallest change that fixes the root cause.
 - Do not add a runtime dependency without explicit approval.
@@ -24,25 +25,53 @@ the `skill` tool before acting.
 Run these before reporting completion:
 
 ```powershell
-Get-ChildItem content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
-node --test test/core.test.mjs test/background.test.mjs test/print.test.mjs
+Get-ChildItem lib\*.js, providers\*.js, content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
+node --test test/core.test.mjs test/tailieu.test.mjs test/background.test.mjs test/print.test.mjs
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ```
 
-For the browser path, load the unpacked extension and test a free document on
-`studocu.vn` and `studocu.com`, including a 375 px viewport.
+For the browser path, load the unpacked extension and test:
 
-## StudocuDown constraints
+- a free document on `studocu.vn` and `studocu.com`, including a 375 px viewport;
+- a TaiLieu.VN document with a full public PDF, one with a truncated PDF, and
+  one without a public PDF, including a 375 px viewport.
 
-- Manifest V3 only. Do not add permissions unless the feature cannot work without them.
-- Approved permissions: `cookies` and `browsingData`, plus `host_permissions` for
-  the four Studocu domains. They exist only for the Reset phiên flow (removing
-  `HttpOnly` cookies, HTTP cache, and service workers). Ask before adding more.
-- Only fetch from `https://doc-assets.studocu.com/` and `https://website-assets.studocu.com/`.
-- Sanitize fetched page HTML: remove `script`, `iframe`, `object`, `embed`, `link`, `style`, `on*` attributes, and `javascript:` URLs.
-- Never use `eval`, `new Function`, or unsanitized `innerHTML` with fetched content.
-- Content scripts: use `document_idle`, specific domain matches, a scoped and debounced `MutationObserver`, and cleanup on `pagehide`.
-- Limit concurrent fetches to 6 or fewer. Release data URLs, blobs, and large strings after printing.
+## Architecture
+
+- `lib/` holds site-agnostic code: `core.js` (namespace, fetch, files, reset),
+  `sanitize.js` (page fragment sanitising), `render.js` (print document),
+  `registry.js` (provider lookup, host and asset allowlists).
+- `providers/<id>.js` owns everything site-specific. It registers itself with
+  `DocDown.registerProvider({ id, domains, assetHosts, isDocumentPage,
+  isAvailable, isAllowedAssetUrl, actionLabel, run, start })`.
+- Adding a site means adding one provider file plus manifest entries. Do not
+  branch on hostnames inside `lib/`.
+
+## DocDown constraints
+
+- Manifest V3 only. Do not add permissions unless the feature cannot work
+  without them.
+- Approved permissions: `cookies` and `browsingData`, plus `host_permissions`
+  for the four Studocu domains and `tailieu.vn`. They exist for the Reset phiên
+  flow (removing `HttpOnly` cookies, HTTP cache, and service workers) and for
+  site detection. Ask before adding more.
+- Only fetch from:
+  - `https://doc-assets.studocu.com/` and `https://website-assets.studocu.com/`;
+  - `https://cdn.tailieu.vn/files/source/` and `https://cdn.tailieu.vn/files/html/`.
+- Validate every fetched URL: HTTPS, allowlisted host, no path traversal, and
+  the expected file type before saving.
+- Sanitize fetched page HTML: remove `script`, `iframe`, `object`, `embed`,
+  `link`, `style`, `on*` attributes, and `javascript:` URLs.
+- Never use `eval`, `new Function`, or unsanitized `innerHTML` with fetched
+  content.
+- Content scripts: use `document_idle`, specific domain matches, a scoped and
+  debounced `MutationObserver`, and cleanup on `pagehide`.
+- Limit concurrent fetches to 6 or fewer. Release data URLs, blobs, and large
+  strings after use.
 - Keep the extension bundle under 100 KB if feasible.
-- Test on `studocu.vn` and `studocu.com`, including a 375 px mobile viewport.
-- Locked/premium pages must be rendered as white note pages with an explanation. Never embed a blurred preview in the PDF and never fabricate content the server did not send.
+- Test on `studocu.vn`, `studocu.com` and `tailieu.vn`, including a 375 px
+  mobile viewport.
+- Locked/premium pages must be rendered as white note pages with an
+  explanation. Never embed a blurred preview in the PDF and never fabricate
+  content the server did not send. A truncated TaiLieu.VN PDF is labelled as a
+  preview instead of being padded out.

@@ -131,6 +131,11 @@
     }
   }
 
+  function pdfFileName(title) {
+    const base = DD.buildFileName(title);
+    return /\.pdf$/i.test(base) ? base : base + '.pdf';
+  }
+
   function inspect() {
     const href = (globalThis.location && globalThis.location.href) || '';
     if (cached && cached.href === href) return cached.info;
@@ -142,7 +147,7 @@
         pdfUrl: isPdfUrl(page.pdfUrl) ? page.pdfUrl : '',
         documentPages: page.documentPages,
         pageCount: headlinePageCount() || page.documentPages,
-        fileName: DD.buildFileName(page.title || document.title) + '.pdf'
+        fileName: pdfFileName(page.title || document.title)
       }
       : null;
 

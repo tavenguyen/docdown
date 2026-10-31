@@ -1,21 +1,15 @@
-# StudocuDown
+# DocDown
 
-StudocuDown is a Chrome extension (Manifest V3) that rebuilds a Studocu
-document from the page assets the site already sends, then opens a print-ready
-tab you can save as PDF. It adds two buttons to document pages: **Tải PDF** and
-**Reset phiên**.
+DocDown is a Chrome extension (Manifest V3) that saves documents you can
+already open on a supported site. It adds a **Tải PDF** button to document
+pages and downloads the file in one click.
 
-## Features
-
-- **Tải PDF** fetches every page from the signed `doc-assets.studocu.com` URLs,
-  so long documents do not need to be scrolled page by page.
-- Keeps both the text layer and the figure/background layer.
-- Removes premium banners and blur overlays where the page exposes the content.
-- Renders premium-locked pages as clean white pages with an explanation, never as
-  blurred previews in the PDF.
-- **Reset phiên** clears cookies (including `HttpOnly`), storage, cache and
+- **TaiLieu.VN** — saves the original PDF that the page already serves from its
+  public CDN, byte for byte.
+- **Studocu** — rebuilds the document from the page assets the site sends, then
+  opens a print-ready tab you can save as PDF.
+- **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
-- Works on `studocu.com`, `studocu.vn`, `studocu.id`, and `studeersnel.nl`.
 
 ## Install
 
@@ -23,13 +17,30 @@ tab you can save as PDF. It adds two buttons to document pages: **Tải PDF** an
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select this folder (the folder containing `manifest.json`).
-5. Open a Studocu document page.
+5. Open a document page on a supported site.
 
 ## Usage
 
+### TaiLieu.VN
+
+1. Open a document on `tailieu.vn/doc/…`.
+2. Click **Tải PDF**.
+3. Chrome saves the PDF with the document title as the file name.
+
+The page reports the page count ("N trang"), and DocDown compares it with the
+page count inside the PDF. When the public file is shorter than the document,
+the status line says so, for example `bản xem trước 20/94 trang`; the full file
+needs a TaiLieu.VN account or VIP access. DocDown never downloads the blurred
+preview the site shows to non-members.
+
+Some documents have no public PDF (for example uploaded Word files, or pages
+whose HTML was never generated). On those pages the button stays hidden.
+
+### Studocu
+
 1. Open a document on a supported Studocu domain and wait for the viewer.
 2. Click the green **Tải PDF** button at the bottom-right.
-3. StudocuDown scans the document and opens a preview tab.
+3. DocDown scans the document and opens a preview tab.
 4. Check the pages, then click **Print / Save as PDF** in the preview toolbar.
 5. In the print dialog, choose **Save as PDF**.
 
@@ -38,32 +49,53 @@ title as the file name, for example
 `Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227.pdf`; the preview
 toolbar shows the same name.
 
+Premium-locked Studocu pages render as clean white pages with an explanation,
+never as blurred previews in the PDF.
+
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click again
-within 3 seconds. The extension removes every Studocu cookie (including
-`HttpOnly`), `localStorage`, `sessionStorage`, Cache Storage, IndexedDB, the HTTP
-cache, and the site's service worker, then reloads the page. You land on the site
-as a first-time visitor: signed out, consent banners again, slower first load.
+within 3 seconds. The extension removes every cookie of the current site
+(including `HttpOnly`), `localStorage`, `sessionStorage`, Cache Storage,
+IndexedDB, the HTTP cache, the site's service worker and the cached document
+assets, then reloads the page. You land on the site as a first-time visitor:
+signed out, consent banners again, slower first load.
 
-This does not reset Studocu's server-side limits. Premium pages stay locked,
-because the server never sends their content to non-subscribers.
+This does not reset server-side limits. Premium pages stay locked, because the
+server never sends their content to non-subscribers.
+
+## Supported sites
+
+| Site | How it saves |
+|---|---|
+| `tailieu.vn` | original PDF from `cdn.tailieu.vn`, with a preview warning when truncated |
+| `studocu.com`, `studocu.vn`, `studocu.id`, `studeersnel.nl` | rebuild + print preview |
+
+## Limits
+
+- DocDown only reuses files the server already sends to your browser. It does
+  not guess URLs, fabricate page content, or embed blurred previews.
+- TaiLieu.VN documents with a truncated public PDF are labelled as previews.
+- Studocu documents over 300 pages are capped so the tab does not run out of
+  memory.
 
 ## Credits
 
 - **StuHack** by [isanchop](https://github.com/isanchop/stuhack), archived on
-  2025-11-24 with no license file. StudocuDown is an independent rewrite for the
-  current Next.js viewer, so the MIT license below covers this repository only.
+  2025-11-24 with no license file. The Studocu provider is an independent
+  rewrite for the current Next.js viewer, so the MIT license below covers this
+  repository only.
 - Third-party agent skills: [`THIRD_PARTY_SKILLS.md`](THIRD_PARTY_SKILLS.md).
 
 ## Disclaimer
 
-- Not affiliated with, endorsed by, or sponsored by Studocu or Studeersnel.
-- Downloading documents may violate Studocu's Terms of Service or copyright law.
+- Not affiliated with, endorsed by, or sponsored by Studocu, Studeersnel or
+  TaiLieu.VN.
+- Downloading documents may violate a site's Terms of Service or copyright law.
   Use it only for material you have the right to access, for personal study.
-- Premium-locked pages are never fabricated and blurred previews are never
-  embedded; the extension only reuses assets the server already sent you.
+- Locked pages are never fabricated and blurred previews are never embedded;
+  the extension only reuses assets the server already sent you.
 
 ## License
 
-[MIT](LICENSE) © 2026 StudocuDown contributors.
+[MIT](LICENSE) © 2026 DocDown contributors.
