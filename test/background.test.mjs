@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js']
+const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js', '../providers/scribd.js']
   .map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 const backgroundSource = fs.readFileSync(new URL('../background.js', import.meta.url), 'utf8');
 
@@ -134,7 +134,8 @@ test('reset message removes cookies and browsing data for the sender tab', async
   assert.deepEqual(Array.from(assets.spec.origins), [
     'https://doc-assets.studocu.com',
     'https://website-assets.studocu.com',
-    'https://cdn.tailieu.vn'
+    'https://cdn.tailieu.vn',
+    'https://html.scribdassets.com'
   ]);
   assert.equal(assets.data.cache, true);
   assert.equal(assets.data.serviceWorkers, true);

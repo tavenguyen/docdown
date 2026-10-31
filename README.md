@@ -8,6 +8,8 @@ pages and downloads the file in one click.
   public CDN, byte for byte.
 - **Studocu** — rebuilds the document from the page assets the site sends, then
   opens a print-ready tab you can save as PDF.
+- **Scribd** — rebuilds the document from the page layers the viewer loads, then
+  opens the same print-ready tab.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -52,6 +54,17 @@ toolbar shows the same name.
 Premium-locked Studocu pages render as clean white pages with an explanation,
 never as blurred previews in the PDF.
 
+### Scribd
+
+1. Open a document on `scribd.com/document/…`.
+2. Click **Tải PDF** at the bottom-right.
+3. Check the preview, then click **Print / Save as PDF**.
+
+DocDown rebuilds each page from the text and image layers the viewer already
+downloads, using the document's own fonts and page size. Pages Scribd marks as
+blurred for your account render as white pages with a note; the blurred preview
+is never embedded.
+
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click again
@@ -70,12 +83,15 @@ server never sends their content to non-subscribers.
 |---|---|
 | `tailieu.vn` | original PDF from `cdn.tailieu.vn`, with a preview warning when truncated |
 | `studocu.com`, `studocu.vn`, `studocu.id`, `studeersnel.nl` | rebuild + print preview |
+| `scribd.com` | rebuild from the viewer's page layers + print preview |
 
 ## Limits
 
 - DocDown only reuses files the server already sends to your browser. It does
   not guess URLs, fabricate page content, or embed blurred previews.
 - TaiLieu.VN documents with a truncated public PDF are labelled as previews.
+- Scribd pages flagged as blurred are printed as white note pages; the extension
+  does not reconstruct content the site hides for your account.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 

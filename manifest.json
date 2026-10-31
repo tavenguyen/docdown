@@ -2,8 +2,8 @@
   "manifest_version": 3,
 
   "name": "DocDown",
-  "version": "2.0.0",
-  "description": "Chrome extension that downloads TaiLieu.VN PDFs and rebuilds Studocu documents into print-ready PDFs from the pages the site already sends.",
+  "version": "2.1.0",
+  "description": "Chrome extension that downloads TaiLieu.VN PDFs and rebuilds Studocu and Scribd documents into print-ready PDFs from the pages the site already sends.",
   "author": "DocDown",
   "icons": {
     "128": "img/icon.png"
@@ -16,7 +16,9 @@
     "https://*.studocu.vn/*",
     "https://*.studocu.id/*",
     "https://*.studeersnel.nl/*",
-    "https://*.tailieu.vn/*"
+    "https://*.tailieu.vn/*",
+    "https://*.scribd.com/*",
+    "https://*.scribdassets.com/*"
   ],
 
   "background": {
@@ -31,7 +33,8 @@
         "https://*.studocu.vn/*",
         "https://*.studocu.id/*",
         "https://*.studeersnel.nl/*",
-        "https://tailieu.vn/*"
+        "https://tailieu.vn/*",
+        "https://www.scribd.com/*"
       ]
     }
   ],
@@ -43,7 +46,8 @@
         "https://*.studocu.vn/*",
         "https://*.studocu.id/*",
         "https://*.studeersnel.nl/*",
-        "https://tailieu.vn/doc/*"
+        "https://tailieu.vn/doc/*",
+        "https://www.scribd.com/document/*"
       ],
       "js": [
         "lib/core.js",
@@ -52,6 +56,7 @@
         "lib/registry.js",
         "providers/studocu.js",
         "providers/tailieu.js",
+        "providers/scribd.js",
         "content/ui.js",
         "content/main.js"
       ],
