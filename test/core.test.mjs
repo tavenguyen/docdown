@@ -357,6 +357,13 @@ test('buildFileName limits length and falls back when empty', () => {
   assert.equal(SH.buildFileName('***'), 'document');
 });
 
+test('buildPrintHtml shows the PDF file name in the preview toolbar', () => {
+  const title = 'Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227';
+  const html = SH.buildPrintHtml({ title, pagesHtml: '', total: 12 });
+  assert.ok(html.includes('12 pages &middot; ' + title), 'toolbar must show the suggested file name');
+  assert.match(html, /<title>Đề Cương/);
+});
+
 test('mapLimit preserves order and respects the concurrency limit', async () => {
   let active = 0;
   let maxActive = 0;

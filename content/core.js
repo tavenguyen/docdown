@@ -521,6 +521,7 @@
   SH.buildPrintHtml = function (options) {
     const opts = options || {};
     const title = SH.escapeHtml(opts.title || 'document');
+    const fileName = SH.escapeHtml(SH.buildFileName(opts.title));
     const version = SH.escapeHtml(opts.version || SH.VERSION);
     const total = Number(opts.total) || 0;
     const css = SH.safeStyleText(opts.css || '');
@@ -554,7 +555,7 @@
     return '<!doctype html><html><head><meta charset="utf-8"><title>' + title +
       '</title><style>' + css + '\n' + printCss + '</style></head><body class="studocudown-print-body">' +
       '<div class="studocudown-toolbar no-print"><div class="studocudown-toolbar-title">StudocuDown v' + version +
-      '</div><div class="studocudown-toolbar-meta">' + total + ' pages</div>' +
+      '</div><div class="studocudown-toolbar-meta">' + total + ' pages &middot; ' + fileName + '</div>' +
       '<div class="studocudown-toolbar-actions"><button id="studocudown-print" type="button" disabled>Print / Save as PDF</button>' +
       '<button id="studocudown-close" type="button">Close</button></div></div>' +
       '<div class="p2hv studocudown-print-root"><div class="studocudown-pages">' + pagesHtml +

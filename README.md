@@ -36,7 +36,8 @@ tab you can save as PDF. It adds two buttons to document pages: **Tải PDF** an
 The print tab never opens the browser print dialog by itself. When you are ready,
 click **Print / Save as PDF**; Chrome suggests the document title as the PDF file
 name (for example
-`Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227.pdf`).
+`Đề Cương Chi Tiết Học Phần Thực Tập Cơ Khí - BMPR230227.pdf`). The preview
+toolbar shows the same name, so you can check it before printing.
 
 ### Reset phiên
 

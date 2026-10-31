@@ -177,8 +177,9 @@
     if (!SH.ui.writePrintWindow(win, html)) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
-    SH.ui.setPrintTitle(win, SH.buildFileName(meta.title));
-    await finalizePrintWindow(win);
+    const fileName = SH.buildFileName(meta.title);
+    SH.ui.setPrintTitle(win, fileName);
+    await finalizePrintWindow(win, fileName);
     SH.ui.progress(results.length, results.length, 'Sẵn sàng in');
     let status = 'Đã tạo bản in (' + results.length + ' trang';
     if (locked.length) status += ', ' + locked.length + ' bị khóa';
@@ -225,8 +226,9 @@
     if (!SH.ui.writePrintWindow(win, html)) {
       throw new Error('Không ghi được bản in. Tab in có thể đã bị đóng.');
     }
-    SH.ui.setPrintTitle(win, SH.buildFileName(SH.getTitle()));
-    await finalizePrintWindow(win);
+    const fileName = SH.buildFileName(SH.getTitle());
+    SH.ui.setPrintTitle(win, fileName);
+    await finalizePrintWindow(win, fileName);
     SH.ui.setState('ready', 'Đã tạo bản in từ DOM (' + total + ' trang)');
   }
 
@@ -282,15 +284,35 @@
     });
   }
 
-  async function finalizePrintWindow(win) {
+  async function finalizePrintWindow(win, fileName) {
     if (!win || win.closed) return;
     const doc = win.document;
     const printButton = doc.getElementById('studocudown-print');
     const closeButton = doc.getElementById('studocudown-close');
+    const name = SH.buildFileName(fileName || doc.title);
+
+    // Chrome reads the print window's title when the preview opens, so keep it
+    // set right before every print, including a manual Ctrl+P.
+    function assertTitle() {
+      try {
+        if (doc.title !== name) doc.title = name;
+      } catch (error) {
+        // The window may be closing.
+      }
+    }
+    assertTitle();
+    try {
+      win.addEventListener('beforeprint', assertTitle);
+    } catch (error) {
+      // Ignore cross-window failures; the title is already set.
+    }
 
     if (printButton) {
       printButton.addEventListener('click', function () {
-        try { win.print(); } catch (error) { /* window may be closed */ }
+        assertTitle();
+        setTimeout(function () {
+          try { win.print(); } catch (error) { /* window may be closed */ }
+        }, 150);
       });
     }
     if (closeButton) {
@@ -334,6 +356,7 @@
       SH.warn('Could not apply page sizes', error);
     }
 
+    assertTitle();
     if (printButton) printButton.disabled = false;
     try { win.focus(); } catch (error) { /* ignore */ }
     // The print dialog is never opened automatically: the user starts printing
