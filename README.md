@@ -1,32 +1,21 @@
 # StudocuDown
 
-A Manifest V3 browser extension that adds a **Tải PDF** button to Studocu
-document pages. It rebuilds the document from the signed page assets the site
-already sends to your browser, then opens a print-ready tab where you can choose
-**Save as PDF**. It also ships a **Reset phiên** button that wipes the site back
-to a first-visit state.
-
-> **Status:** 1.0.0. Independent rewrite of
-> [isanchop/stuhack](https://github.com/isanchop/stuhack) for the current
-> Next.js Studocu viewer, with a full cookie/cache reset and a rewritten
-> download pipeline.
+StudocuDown is a Chrome extension (Manifest V3) that rebuilds a Studocu
+document from the page assets the site already sends, then opens a print-ready
+tab you can save as PDF. It adds two buttons to document pages: **Tải PDF** and
+**Reset phiên**.
 
 ## Features
 
-- Floating **Tải PDF** button on document pages.
-- A **Reset phiên** button that wipes the site back to a first-visit state:
-  cookies (including `HttpOnly`), `localStorage`, `sessionStorage`, Cache Storage,
-  IndexedDB, HTTP cache, and service workers, then reloads the page. Two clicks
-  are required so it cannot fire by accident. You will be signed out.
-- Works on `studocu.com`, `studocu.vn`, `studocu.id`, and `studeersnel.nl`.
-- Fetches all pages directly from the signed `doc-assets.studocu.com` URLs, so
-  long documents do not need to be scrolled page by page.
+- **Tải PDF** fetches every page from the signed `doc-assets.studocu.com` URLs,
+  so long documents do not need to be scrolled page by page.
 - Keeps both the text layer and the figure/background layer.
 - Removes premium banners and blur overlays where the page exposes the content.
-- Renders premium-locked pages as clean white pages with an explanation,
-  never as blurred previews in the PDF.
-- Uses only two permissions (`cookies`, `browsingData`) scoped to the four
-  Studocu domains, no tracking, and no remote code.
+- Renders premium-locked pages as clean white pages with an explanation, never as
+  blurred previews in the PDF.
+- **Reset phiên** clears cookies (including `HttpOnly`), storage, cache and
+  service workers, then reloads the page. It signs you out.
+- Works on `studocu.com`, `studocu.vn`, `studocu.id`, and `studeersnel.nl`.
 
 ## Install
 
@@ -52,10 +41,11 @@ name (for example
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click it again
-within 3 seconds. StudocuDown asks its service worker to remove every Studocu cookie
-(including `HttpOnly` session cookies), `localStorage`, `sessionStorage`, Cache
-Storage, IndexedDB, the HTTP cache, and the site's service worker, then reloads
-the page. The result is the same as visiting the site for the first time:
+within 3 seconds, so the reset cannot fire by accident. StudocuDown asks its
+service worker to remove every Studocu cookie (including `HttpOnly` session
+cookies), `localStorage`, `sessionStorage`, Cache Storage, IndexedDB, the HTTP
+cache, and the site's service worker, then reloads the page. The result is the
+same as visiting the site for the first time:
 
 - you are **signed out** and must log in again;
 - cookie banners and consent prompts appear again;
@@ -123,7 +113,7 @@ back to cloning the pages currently rendered in the viewer.
   `website-assets.studocu.com`.
 - Fetched page HTML is sanitised: scripts, iframes, event handlers, and
   `javascript:` URLs are removed.
-- Nothing is sent to a third-party server.
+- The extension sends nothing to a third-party server.
 - The print document is built in a same-origin `about:blank` tab and is never
   uploaded.
 
@@ -180,10 +170,10 @@ node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ## Credits
 
 - Original project: **StuHack** by
-  [isanchop](https://github.com/isanchop/stuhack) — archived on 2025-11-24 and
-  published without a license file. StudocuDown is an independent rewrite for the
-  current Next.js viewer; none of the original source files are reused, so the
-  MIT license below covers this repository only.
+  [isanchop](https://github.com/isanchop/stuhack), archived on 2025-11-24 with
+  no license file. StudocuDown is an independent rewrite for the current Next.js
+  viewer; none of the original source files are reused, so the MIT license below
+  covers this repository only.
 - Third-party agent skills used during development are documented in
   [`THIRD_PARTY_SKILLS.md`](THIRD_PARTY_SKILLS.md).
 

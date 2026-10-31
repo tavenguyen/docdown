@@ -3,7 +3,7 @@
 
   "name": "StudocuDown",
   "version": "1.0.0",
-  "description": "Download Studocu documents as PDF, remove banners and blur where possible",
+  "description": "Chrome extension that rebuilds Studocu documents into print-ready PDFs from the pages the site already sends.",
   "author": "StudocuDown",
   "icons": {
     "128": "img/icon.png"
