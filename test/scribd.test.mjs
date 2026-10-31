@@ -53,6 +53,7 @@ function loadScribd(options) {
     URL,
     AbortController,
     DOMParser: class {},
+    fetch: opts.fetch || (() => Promise.reject(new Error('fetch not stubbed'))),
     setTimeout,
     clearTimeout,
     Promise
@@ -150,4 +151,59 @@ test('locked pages render a white note page, never a preview', () => {
   assert.match(normal, /class="pf docdown-scribd-page"/);
   assert.match(normal, /width:902px;height:1274px/);
   assert.match(normal, /<div class="newpage">/);
+});
+
+test('a transient fetch failure is retried with a cache reload', async () => {
+  const calls = [];
+  const DD = loadScribd({
+    fetch: async (url, init) => {
+      calls.push(init);
+      if (calls.length < 3) throw new TypeError('Failed to fetch');
+      return {
+        ok: true,
+        status: 200,
+        text: async () => 'window.page1_callback(["<div>x</div>"])'
+      };
+    }
+  });
+  DD.sleep = async () => {};
+
+  const fragment = await DD.providerById('scribd').fetchPage({
+    pageNumber: 1,
+    contentUrl: 'https://html.scribdassets.com/abc123/pages/1-hash1.jsonp'
+  });
+
+  assert.equal(fragment, '<div>x</div>');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].cache, undefined, 'first attempt uses the default cache');
+  assert.equal(calls[1].cache, 'reload', 'retry bypasses a poisoned cache entry');
+});
+
+test('a page that keeps failing stops after three attempts', async () => {
+  let calls = 0;
+  const DD = loadScribd({
+    fetch: async () => {
+      calls += 1;
+      throw new TypeError('Failed to fetch');
+    }
+  });
+  DD.sleep = async () => {};
+
+  await assert.rejects(
+    () => DD.providerById('scribd').fetchPage({
+      pageNumber: 278,
+      contentUrl: 'https://html.scribdassets.com/abc123/pages/278-hash278.jsonp'
+    }),
+    /Failed to fetch/
+  );
+  assert.equal(calls, 3);
+});
+
+test('large documents lower the fetch concurrency', () => {
+  const DD = loadScribd();
+  const provider = DD.providerById('scribd');
+  assert.equal(provider.pageConcurrency(18), 4);
+  assert.equal(provider.pageConcurrency(150), 4);
+  assert.equal(provider.pageConcurrency(151), 3);
+  assert.equal(provider.pageConcurrency(293), 3);
 });

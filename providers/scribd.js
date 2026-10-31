@@ -253,17 +253,30 @@
     ].filter(Boolean).join('\n');
   }
 
-  async function fetchPage(page) {
+  const RETRY_DELAYS = [300, 900];
+  const LARGE_DOC_PAGES = 150;
+  const LARGE_DOC_CONCURRENCY = 3;
+
+  function pageConcurrency(total) {
+    return Number(total) > LARGE_DOC_PAGES ? LARGE_DOC_CONCURRENCY : CONCURRENCY;
+  }
+
+  function describeError(error) {
+    const name = error && error.name ? error.name : 'Error';
+    const message = error && error.message ? error.message : String(error);
+    return name + ': ' + message;
+  }
+
+  async function fetchPageOnce(page, forceReload) {
     if (!isPdfUrl(page.contentUrl)) {
       throw new Error('Page ' + page.pageNumber + ': unexpected URL');
     }
     const controller = new AbortController();
     const timer = setTimeout(function () { controller.abort(); }, DD.FETCH_TIMEOUT);
     try {
-      const response = await fetch(page.contentUrl, {
-        credentials: 'omit',
-        signal: controller.signal
-      });
+      const options = { credentials: 'omit', signal: controller.signal };
+      if (forceReload) options.cache = 'reload';
+      const response = await fetch(page.contentUrl, options);
       if (!response.ok) throw new Error('Page ' + page.pageNumber + ': HTTP ' + response.status);
       return parsePageJsonp(await response.text());
     } finally {
@@ -271,23 +284,64 @@
     }
   }
 
+  // A failed request surfaces as `TypeError: Failed to fetch` when the network
+  // drops, the tab navigates, or the CDN throttles the burst. Retry with a
+  // cache-busting reload before giving up on the page.
+  async function fetchPage(page) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= RETRY_DELAYS.length + 1; attempt++) {
+      try {
+        return await fetchPageOnce(page, attempt > 1);
+      } catch (error) {
+        lastError = error;
+        if (attempt > RETRY_DELAYS.length) break;
+        const delay = RETRY_DELAYS[attempt - 1] + Math.round(Math.random() * 200);
+        DD.warn(
+          'Scribd page ' + page.pageNumber + ' attempt ' + attempt + ' failed (' +
+          describeError(error) + '); retrying in ' + delay + 'ms'
+        );
+        await DD.sleep(delay);
+      }
+    }
+    throw lastError;
+  }
+
   async function buildPages(doc, total) {
     const prepared = {};
+    const failed = [];
     let done = 0;
-    await DD.mapLimit(doc.pages, CONCURRENCY, async function (page) {
+    const concurrency = pageConcurrency(doc.pages.length);
+    if (concurrency < CONCURRENCY) {
+      DD.log('Large Scribd document (' + doc.pages.length + ' pages); using ' +
+        concurrency + ' parallel requests');
+    }
+
+    await DD.mapLimit(doc.pages, concurrency, async function (page) {
       if (page.pageNumber > total) return;
       if (!page.blur) {
         try {
           prepared[page.pageNumber] = preparePage(await fetchPage(page));
         } catch (error) {
-          DD.warn('Could not load Scribd page ' + page.pageNumber, error);
           prepared[page.pageNumber] = '';
+          failed.push({ page: page.pageNumber, error: describeError(error) });
+          DD.warn('Could not load Scribd page ' + page.pageNumber + ' after retries', error);
         }
       }
       done += 1;
       DD.ui.progress(done, total, 'Đang tải trang ' + done + '/' + total + '…');
     });
-    return prepared;
+
+    if (failed.length) {
+      DD.warn('Scribd pages that still failed: ' + failed.map(function (item) {
+        return item.page;
+      }).join(', '));
+      if (failed.some(function (item) { return /TypeError/.test(item.error); })) {
+        DD.warn('A request that fails with TypeError is usually blocked or interrupted ' +
+          '(adblock, proxy, VPN, network drop, or a page navigation during the build).');
+      }
+    }
+
+    return { prepared: prepared, failed: failed };
   }
 
   function getDoc() {
@@ -324,10 +378,14 @@
       if (doc.pages.length > DD.MAX_PAGES) {
         DD.ui.toast('Tài liệu có ' + doc.pages.length + ' trang; chỉ xử lý ' +
           DD.MAX_PAGES + ' trang đầu để tránh tốn RAM.', 'error');
+      } else if (doc.pages.length > 200) {
+        DD.ui.toast('Tài liệu ' + doc.pages.length + ' trang; tab in có thể tốn nhiều RAM. ' +
+          'Nếu treo, hãy đóng bớt tab khác.', 'error');
       }
 
       DD.ui.progress(0, total, 'Đang tải 0/' + total + ' trang…');
-      const prepared = await buildPages(doc, total);
+      const built = await buildPages(doc, total);
+      const prepared = built.prepared;
 
       const pages = doc.pages.slice(0, total);
       const missing = pages.filter(function (page) {
@@ -388,6 +446,8 @@
     parsePageJsonp: parsePageJsonp,
     buildCss: buildCss,
     pageHtml: pageHtml,
+    fetchPage: fetchPage,
+    pageConcurrency: pageConcurrency,
     run: run
   };
   DD.registerProvider(provider);
