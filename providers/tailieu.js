@@ -8,6 +8,9 @@
   const CDN_HOSTS = new Set(['cdn.tailieu.vn']);
   const SOURCE_PREFIX = '/files/source/';
   const HTML_PREFIX = '/files/html/';
+  // Reading the page count decodes the whole file to a string, so skip that
+  // step for large PDFs to keep the tab's memory bounded.
+  const COUNT_LIMIT_BYTES = 25 * 1024 * 1024;
 
   // Nuxt serialises its payload with devalue: every string, number, object and
   // array lives in one flat array and every slot holds an index into it.
@@ -114,6 +117,7 @@
       const parsed = new URL(url, (globalThis.location && globalThis.location.href) || undefined);
       if (parsed.protocol !== 'https:') return false;
       if (!CDN_HOSTS.has(parsed.hostname.toLowerCase())) return false;
+      
       if (parsed.pathname.indexOf('..') !== -1) return false;
       return parsed.pathname.indexOf(SOURCE_PREFIX) === 0 ||
         parsed.pathname.indexOf(HTML_PREFIX) === 0;
@@ -146,7 +150,7 @@
         title: page.title || DD.buildFileName(document.title),
         pdfUrl: isPdfUrl(page.pdfUrl) ? page.pdfUrl : '',
         documentPages: page.documentPages,
-        pageCount: headlinePageCount() || page.documentPages,
+        pageCount: headlinePageCount(),
         fileName: pdfFileName(page.title || document.title)
       }
       : null;
@@ -162,6 +166,19 @@
 
   function formatMb(bytes) {
     return (Number(bytes) / 1048576).toFixed(1) + ' MB';
+  }
+
+  // The site compares its own page count with the file it serves. When the
+  // public file is shorter, say so instead of pretending it is complete.
+  function buildStatus(info, bytes, pages) {
+    let message = 'Đã tải ' + info.fileName + ' (' + formatMb(bytes);
+    if (pages) message += ', ' + pages + ' trang';
+    message += ')';
+    if (pages && info.pageCount && pages < info.pageCount) {
+      message += '. Đây là bản xem trước ' + pages + '/' + info.pageCount +
+        ' trang; bản đầy đủ cần đăng nhập hoặc tài khoản VIP.';
+    }
+    return message;
   }
 
   async function run() {
@@ -194,6 +211,11 @@
         throw new Error('Máy chủ trả về lỗi ' + response.status + '.');
       }
 
+      const declared = Number(response.headers.get('content-length'));
+      if (declared > DD.MAX_PDF_BYTES) {
+        throw new Error('File PDF quá lớn (' + formatMb(declared) + ').');
+      }
+
       const blob = await response.blob();
       if (!blob.size) throw new Error('File PDF rỗng.');
       if (blob.size > DD.MAX_PDF_BYTES) {
@@ -202,23 +224,16 @@
 
       DD.ui.progress(2, 3, 'Đang lưu ' + formatMb(blob.size) + '…');
       let pages = null;
-      try {
-        pages = DD.countPdfPages(await blob.arrayBuffer());
-      } catch (error) {
-        pages = null;
+      if (blob.size <= COUNT_LIMIT_BYTES) {
+        try {
+          pages = DD.countPdfPages(await blob.arrayBuffer());
+        } catch (error) {
+          pages = null;
+        }
       }
 
       DD.saveBlob(blob, info.fileName);
-
-      let message = 'Đã tải ' + info.fileName + ' (' + formatMb(blob.size);
-      if (pages) message += ', ' + pages + ' trang';
-      message += ')';
-      if (pages && info.pageCount && pages < info.pageCount) {
-        message += '. Đây là bản xem trước ' + pages + '/' + info.pageCount +
-          ' trang; bản đầy đủ cần đăng nhập hoặc tài khoản VIP.';
-      } else if (pages && info.pageCount && pages > info.pageCount) {
-        message += '.';
-      }
+      const message = buildStatus(info, blob.size, pages);
 
       DD.ui.progress(3, 3, message);
       DD.ui.setState('ready', message);
@@ -245,6 +260,7 @@
     isAllowedAssetUrl: isAllowedAssetUrl,
     inspect: inspect,
     parsePageData: parsePageData,
+    buildStatus: buildStatus,
     run: run
   };
   DD.registerProvider(provider);

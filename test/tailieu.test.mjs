@@ -104,10 +104,26 @@ test('inspect reads the title, PDF URL and displayed page count', () => {
   assert.equal(provider.isAvailable(), true);
 });
 
-test('inspect falls back to the payload page count when the headline is missing', () => {
+test('a missing headline does not invent a page count', () => {
   const DD = loadTailieu({ headline: '' });
   const info = DD.getProvider('tailieu.vn').inspect();
-  assert.equal(info.pageCount, 53);
+  assert.equal(info.pageCount, 0, 'payload page counts are unreliable');
+  assert.equal(info.pdfUrl, SAMPLE, 'the PDF is still downloadable');
+});
+
+test('the status line warns when the public PDF is a preview', () => {
+  const DD = loadTailieu();
+  const provider = DD.getProvider('tailieu.vn');
+  const info = provider.inspect();
+
+  const full = provider.buildStatus(info, 2000000, 53);
+  assert.ok(!full.includes('xem trước'), 'a complete file is not labelled as a preview');
+
+  const preview = provider.buildStatus(info, 2000000, 20);
+  assert.ok(preview.includes('bản xem trước 20/53 trang'));
+
+  const unknown = provider.buildStatus({ ...info, pageCount: 0 }, 2000000, 20);
+  assert.ok(!unknown.includes('xem trước'), 'no claim when the page count is unknown');
 });
 
 test('only the CDN PDF source is accepted', () => {

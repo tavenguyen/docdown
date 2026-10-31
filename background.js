@@ -12,8 +12,8 @@ const SITE_DATA = {
   localStorage: true,
   serviceWorkers: true
 };
-// browsingData removes cookies per site (eTLD+1), so the asset origins on
-// studocu.com must never be part of a cookie wipe requested for studocu.vn.
+// browsingData removes cookies per site (eTLD+1), so asset origins must never
+// be part of a cookie wipe requested for the site that owns them.
 const ASSET_DATA = {
   cache: true,
   cacheStorage: true,
