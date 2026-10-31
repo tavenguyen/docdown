@@ -49,44 +49,6 @@ as a first-time visitor: signed out, consent banners again, slower first load.
 This does not reset Studocu's server-side limits. Premium pages stay locked,
 because the server never sends their content to non-subscribers.
 
-## Limitations
-
-- Some premium pages are never sent to non-subscribers. They become clean white
-  pages with a **premium-locked** note; the blurred preview is never embedded and
-  clearing cookies does not unlock them.
-- Signed URLs expire. Start the download while the document page is still open.
-- **Reset phiên signs you out.** A document that requires login will not load
-  until you sign in again.
-- Very large documents are capped at 300 pages per run to limit memory use.
-
-## Privacy and security
-
-- `manifest.json` asks for `cookies` and `browsingData`, plus host permissions for
-  the four Studocu domains. Chrome warns about both when you install it.
-- Those permissions exist for **Reset phiên** only: removing `HttpOnly` cookies,
-  the HTTP cache and the site's service worker. A reset on `studocu.vn` never
-  touches `studocu.com` data.
-- The service worker accepts one message type (`studocudown-reset`) and rejects
-  messages from other extension IDs and hostnames outside the four domains. The
-  print preview accepts a document only from the page that opened it.
-- The extension fetches only `doc-assets.studocu.com` and
-  `website-assets.studocu.com`, sanitises the HTML it receives (scripts, iframes,
-  event handlers, `javascript:` URLs and `<script>` blocks removed), and sends
-  nothing to a third-party server.
-
-## Troubleshooting
-
-- **No button:** confirm the URL is a document page and the domain is supported.
-  Reload the page after installing or updating the extension.
-- **Blank or missing pages:** check the Network tab for 403 responses. Signed URLs
-  may have expired; reload the document, then try **Reset phiên**.
-- **Reset phiên signed me out:** that is expected. The reset deletes the
-  `HttpOnly` session cookie, so sign in again.
-- **Reset phiên only cleared storage:** the service worker did not answer. Reload
-  the extension in `chrome://extensions` and try again.
-- **Premium-locked white page:** Studocu did not send that page, so the PDF shows a
-  white note page. Clearing cookies cannot unlock server-gated content.
-
 ## Credits
 
 - **StuHack** by [isanchop](https://github.com/isanchop/stuhack), archived on
