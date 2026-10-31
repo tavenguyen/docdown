@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js', '../providers/scribd.js', '../providers/slideshare.js']
+const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js', '../providers/scribd.js', '../providers/slideshare.js', '../providers/coursehero.js']
   .map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 const backgroundSource = fs.readFileSync(new URL('../background.js', import.meta.url), 'utf8');
 
@@ -136,7 +136,8 @@ test('reset message removes cookies and browsing data for the sender tab', async
     'https://website-assets.studocu.com',
     'https://cdn.tailieu.vn',
     'https://html.scribdassets.com',
-    'https://image.slidesharecdn.com'
+    'https://image.slidesharecdn.com',
+    'https://www.coursehero.com'
   ]);
   assert.equal(assets.data.cache, true);
   assert.equal(assets.data.serviceWorkers, true);

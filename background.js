@@ -1,4 +1,4 @@
-importScripts('lib/core.js', 'lib/registry.js', 'providers/studocu.js', 'providers/tailieu.js', 'providers/scribd.js', 'providers/slideshare.js');
+importScripts('lib/core.js', 'lib/registry.js', 'providers/studocu.js', 'providers/tailieu.js', 'providers/scribd.js', 'providers/slideshare.js', 'providers/coursehero.js');
 
 const DD = globalThis.DocDown;
 if (!DD) throw new Error('DocDown core did not load');

@@ -12,6 +12,8 @@ pages and downloads the file in one click.
   opens the same print-ready tab.
 - **SlideShare** — saves every slide from the viewer's slide images, one per
   page, through the same print-ready tab.
+- **Course Hero** — rebuilds the pages the viewer renders for your account and
+  marks the rest as locked.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -78,6 +80,19 @@ Each slide becomes one page at the presentation's own aspect ratio, using the
 2048 px slide image. A slide whose image does not download is printed as a
 white page with a note instead of a broken image.
 
+### Course Hero
+
+1. Open a document on `coursehero.com/file/…`.
+2. Click **Tải PDF** at the bottom-right.
+3. The preview shows the pages Course Hero renders for you, followed by a note
+   page that lists how many pages were withheld.
+
+Course Hero only sends the preview pages to visitors who are not signed in
+(usually 2 of 8), and its background images are already redacted on the server.
+DocDown keeps the readable text layer, drops the blurred artwork, and never
+invents the pages the site did not send. Sign in with access to get more pages
+rendered in the viewer.
+
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click again
@@ -98,6 +113,7 @@ server never sends their content to non-subscribers.
 | `studocu.com`, `studocu.vn`, `studocu.id`, `studeersnel.nl` | rebuild + print preview |
 | `scribd.com` | rebuild from the viewer's page layers + print preview |
 | `slideshare.net` | slide images from `image.slidesharecdn.com` + print preview |
+| `coursehero.com` | preview pages rendered in the viewer (text layer only) |
 
 ## Limits
 
@@ -108,6 +124,8 @@ server never sends their content to non-subscribers.
   does not reconstruct content the site hides for your account.
 - SlideShare presentations are saved from the slide images the viewer loads; the
   original PPTX/DOCX download stays behind SlideShare's own login flow.
+- Course Hero is preview-only for visitors without an account: its server sends
+  about 2 pages with redacted artwork, so the PDF is a labelled preview.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 

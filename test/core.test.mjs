@@ -421,6 +421,12 @@ test('buildFileName strips the TaiLieu.VN site suffix', () => {
   assert.equal(SH.buildFileName('Bài giảng - tailieu.vn'), 'Bài giảng');
 });
 
+test('buildFileName strips the newer site suffixes', () => {
+  assert.equal(SH.buildFileName('Comprehensive Interview Template | Course Hero'), 'Comprehensive Interview Template');
+  assert.equal(SH.buildFileName('Báo cáo - Scribd'), 'Báo cáo');
+  assert.equal(SH.buildFileName('Thiết bị | SlideShare'), 'Thiết bị');
+});
+
 test('countPdfPages reads plain and compressed page trees', async () => {
   const plain = new TextEncoder().encode('%PDF-1.6\n1 0 obj << /Type /Pages /Count 53 >> endobj');
   assert.equal(await SH.countPdfPages(plain), 53);
