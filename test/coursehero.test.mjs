@@ -210,3 +210,248 @@ test('isAvailable is false when the viewer rendered no text page', () => {
   const notFile = loadCourseHero({ pathname: '/homework-help/' });
   assert.equal(notFile.providerById('coursehero').isDocumentPage(), false);
 });
+
+test('classifyPage separates full, partial and locked pages', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+
+  assert.equal(provider.classifyPage(null), 'locked');
+  assert.equal(provider.classifyPage({ redactions: [] }), 'full');
+  assert.equal(provider.classifyPage({
+    redactions: [{ x: 0, y: 0, w: 10, h: 10, reason: 'blurred' }]
+  }), 'partial');
+  assert.equal(provider.classifyPage({
+    redactions: [{ x: 0, y: 0, w: 4, h: 4, reason: 'foreign' }]
+  }), 'full', 'a small foreign icon alone does not make the page partial');
+  assert.equal(provider.classifyPage({ redactions: [], unresolved: true }), 'partial');
+});
+
+test('summarize counts captured, partial and locked pages', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const summary = provider.summarize([
+    { status: 'full' },
+    { status: 'partial' },
+    { status: 'full' }
+  ], 8);
+
+  assert.equal(summary.total, 8);
+  assert.equal(summary.captured, 3);
+  assert.equal(summary.full, 2);
+  assert.equal(summary.partial, 1);
+  assert.equal(summary.locked, 5);
+  assert.equal(summary.mode, 'preview');
+});
+
+test('summarize reports partial when every page is captured but one is redacted', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const summary = provider.summarize([{ status: 'full' }, { status: 'partial' }], 2);
+
+  assert.equal(summary.mode, 'partial');
+  assert.equal(summary.locked, 0);
+  assert.equal(summary.partial, 1);
+});
+
+test('summarize reports full when every page is clear', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const summary = provider.summarize([{ status: 'full' }, { status: 'full' }], 2);
+
+  assert.equal(summary.mode, 'full');
+  assert.equal(summary.partial, 0);
+  assert.equal(summary.locked, 0);
+});
+
+test('coverageOf counts overlapping rects once and clips them to the page', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const half = { x: 0, y: 0, w: 100, h: 50 };
+
+  assert.equal(provider.coverageOf([half], 100, 100), 0.5);
+  assert.equal(provider.coverageOf([half, half], 100, 100), 0.5, 'overlap is not double counted');
+  assert.equal(provider.coverageOf([{ x: -50, y: -50, w: 400, h: 400 }], 100, 100), 1);
+  assert.equal(provider.coverageOf([], 100, 100), 0);
+  assert.equal(provider.coverageOf([{ x: 0, y: 0, w: 0, h: 0 }], 100, 100), 0);
+  assert.equal(provider.coverageOf([half], 0, 0), 0, 'a page with no size has no coverage');
+});
+
+test('pageHtml draws the redaction overlay without leaking the asset URL', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.pageHtml({
+    pageNumber: 1,
+    width: 1000,
+    height: 800,
+    rawWidth: 1000,
+    rawHeight: 800,
+    scale: 1,
+    html: '<div class="t">x</div>',
+    redactions: [{ x: 12, y: 340, w: 820, h: 96, reason: 'blurred' }]
+  });
+
+  assert.match(html, /docdown-ch-redactions/);
+  assert.match(html, /left:12px;top:340px;width:820px;height:96px/);
+  assert.ok(!/\/blur\//.test(html), 'the blurred asset URL must not reach the PDF');
+  assert.ok(!/https?:\/\/www\.coursehero\.com\/asset/.test(html), 'no asset URL in the overlay');
+});
+
+test('pageHtml omits the overlay when nothing was redacted', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.pageHtml({
+    pageNumber: 1,
+    width: 1000,
+    height: 800,
+    rawWidth: 1000,
+    rawHeight: 800,
+    scale: 1,
+    html: '<div class="t">x</div>',
+    redactions: []
+  });
+
+  assert.ok(!html.includes('docdown-ch-redactions'));
+});
+
+test('pageHtml drops rects too small to be worth marking', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.pageHtml({
+    pageNumber: 1,
+    width: 1000,
+    height: 800,
+    rawWidth: 1000,
+    rawHeight: 800,
+    scale: 1,
+    html: '<div class="t">x</div>',
+    redactions: [{ x: 0, y: 0, w: 2, h: 2, reason: 'blurred' }]
+  });
+
+  assert.ok(!html.includes('docdown-ch-redacted'));
+});
+
+test('a partial page carries an inline note naming the page and the share', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.partialNoteHtml({ pageNumber: 3, coverage: 0.182 });
+
+  assert.match(html, /docdown-ch-note/);
+  assert.match(html, /Trang 3/);
+  assert.match(html, /18%/);
+  assert.ok(!/<script/i.test(html));
+});
+
+test('partialNoteHtml escapes whatever page label it is given', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.partialNoteHtml({ pageNumber: '<b>x</b>', coverage: 0.5 });
+
+  assert.ok(!html.includes('<b>'));
+  assert.match(html, /&lt;b&gt;/);
+});
+
+test('partialNoteHtml never prints a zero percentage', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.partialNoteHtml({ pageNumber: 4, coverage: 0.001 });
+
+  assert.ok(!html.includes('0%'), 'a rounding artifact must not read as "0% blurred"');
+  assert.match(html, /một phần nội dung bị Course Hero làm mờ/);
+});
+
+test('the preview note says how many captured pages are only partly readable', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.notePageHtml(1000, 774, 8, 5, '', 2);
+
+  assert.match(html, /3\/8 trang/);
+  assert.match(html, /bị làm mờ một phần/);
+});
+
+test('the note drops the locked sentence when no page is locked', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const html = provider.notePageHtml(1000, 774, 3, 0, '', 1);
+
+  assert.match(html, /Bản in một phần/);
+  assert.ok(!html.includes('0 trang còn lại'), 'no page is locked, so do not say zero are');
+});
+
+function fakeNode(tag, attributes, box, styleText) {
+  return {
+    tagName: tag,
+    textContent: styleText || '',
+    getAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null;
+    },
+    getBoundingClientRect() {
+      return box || { left: 0, top: 0, width: 0, height: 0 };
+    }
+  };
+}
+
+function fakeRoot(children, styles) {
+  return {
+    getAttribute: function () { return null; },
+    getBoundingClientRect: function () {
+      return { left: 0, top: 0, width: 1000, height: 800 };
+    },
+    querySelectorAll: function (selector) {
+      if (selector === '*') return children;
+      if (selector === 'style') return styles || [];
+      return [];
+    }
+  };
+}
+
+test('collectRedactions maps blurred and foreign artwork to page coordinates', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const HASH_LOCAL = '6943787cd603c2a23b40c1d9ea9a251771bd5b20';
+  const pageRect = { left: 10, top: 20, width: 1000, height: 800 };
+
+  const blurred = fakeNode('IMG', {
+    src: '/asset/bg/blur/' + HASH_LOCAL + '/splits/page-1.webp'
+  }, { left: 110, top: 220, width: 800, height: 100 });
+  const clear = fakeNode('IMG', {
+    src: '/asset/bg/' + HASH_LOCAL + '/splits/page-1.webp'
+  }, { left: 0, top: 0, width: 500, height: 500 });
+  const foreign = fakeNode('IMG', {
+    src: 'https://cdn.example.test/logo.svg'
+  }, { left: 0, top: 0, width: 20, height: 20 });
+  const inlineBlur = fakeNode('DIV', {
+    style: 'background-image:url(/asset/bg/blur/' + HASH_LOCAL + '/x.webp)'
+  }, { left: 10, top: 20, width: 100, height: 50 });
+  const plain = fakeNode('DIV', { style: 'color:red' }, { left: 0, top: 0, width: 10, height: 10 });
+
+  const result = provider.collectRedactions(
+    fakeRoot([blurred, clear, foreign, inlineBlur, plain]), pageRect
+  );
+
+  assert.equal(result.unresolved, false);
+  assert.equal(result.rects.length, 3);
+  assert.deepEqual(
+    { x: result.rects[0].x, y: result.rects[0].y, w: result.rects[0].w, h: result.rects[0].h },
+    { x: 100, y: 200, w: 800, h: 100 },
+    'coordinates are relative to the page root'
+  );
+  assert.equal(result.rects[0].reason, 'blurred');
+  assert.equal(result.rects[1].reason, 'foreign');
+  assert.equal(result.rects[2].reason, 'blurred');
+});
+
+test('collectRedactions flags a stylesheet blur and an unmeasurable node', () => {
+  const DD = loadCourseHero();
+  const provider = DD.providerById('coursehero');
+  const pageRect = { left: 0, top: 0, width: 1000, height: 800 };
+
+  const hiddenBlur = fakeNode('IMG', {
+    src: '/asset/bg/blur/abc/x.webp'
+  }, null);
+  const fromStylesheet = fakeRoot([], [
+    fakeNode('STYLE', {}, null, '.p1{background:url(/asset/bg/blur/abc/y.webp)}')
+  ]);
+
+  assert.equal(provider.collectRedactions(fromStylesheet, pageRect).unresolved, true);
+  assert.equal(provider.collectRedactions(fakeRoot([hiddenBlur]), pageRect).unresolved, true);
+});

@@ -12,8 +12,9 @@ pages and downloads the file in one click.
   opens the same print-ready tab.
 - **SlideShare** — saves every slide from the viewer's slide images, one per
   page, through the same print-ready tab.
-- **Course Hero** — rebuilds the pages the viewer renders for your account and
-  marks the rest as locked.
+- **Course Hero** — rebuilds the pages the viewer renders for your account, marks
+  the rest as locked, and marks any redacted area inside a page as partly
+  unreadable.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -85,16 +86,21 @@ white page with a note instead of a broken image.
 1. Open a document on `coursehero.com/file/…`.
 2. Click **Tải PDF** at the bottom-right.
 3. The preview shows the pages Course Hero renders for you, followed by a note
-   page that lists how many pages were withheld.
+   page that lists how many pages were captured, how many are only partly
+   readable, and how many were withheld.
 
 Course Hero only sends the preview pages to visitors who are not signed in
 (usually 2 of 8), and its background images are already redacted on the server.
-DocDown keeps the readable text layer, drops the blurred artwork, and adds a
-note page with a link to Course Hero's own unlock page; it never invents the
-pages the site did not send.
+DocDown keeps the readable text layer and drops the blurred artwork, but it no
+longer drops it silently: every redacted region is drawn as a hatched block in
+the place it occupied, and the page carries a short note such as
+`Trang 2: 18% nội dung bị Course Hero làm mờ.` The note page at the end says how
+many pages were captured, how many of those are only partly readable, and how
+many are withheld, with a link to Course Hero's own unlock page. DocDown never
+invents the pages or the pixels the site did not send.
 
 When your account can view every page, the viewer renders them with clear
-backgrounds and DocDown prints the full document instead of the preview.
+backgrounds and DocDown prints the full document with no hatch and no note.
 
 ### Reset phiên
 
@@ -116,7 +122,7 @@ server never sends their content to non-subscribers.
 | `studocu.com`, `studocu.vn`, `studocu.id`, `studeersnel.nl` | rebuild + print preview |
 | `scribd.com` | rebuild from the viewer's page layers + print preview |
 | `slideshare.net` | slide images from `image.slidesharecdn.com` + print preview |
-| `coursehero.com` | preview pages rendered in the viewer (text layer only) |
+| `coursehero.com` | preview pages rendered in the viewer; redacted areas marked |
 
 ## Limits
 
@@ -128,7 +134,10 @@ server never sends their content to non-subscribers.
 - SlideShare presentations are saved from the slide images the viewer loads; the
   original PPTX/DOCX download stays behind SlideShare's own login flow.
 - Course Hero is preview-only for visitors without an account: its server sends
-  about 2 pages with redacted artwork, so the PDF is a labelled preview.
+  about 2 pages with redacted artwork, so the PDF is a labelled preview. Any
+  redacted area is printed as a hatched block, never as a blurred image, and a
+  page that mixes readable text with redacted artwork is labelled as partly
+  readable rather than silently printed as if it were complete.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 
