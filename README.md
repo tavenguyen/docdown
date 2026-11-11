@@ -16,7 +16,8 @@ pages and downloads the file in one click.
   the rest as locked, and marks any redacted area inside a page as partly
   unreadable.
 - **Academia.edu** — rebuilds the document from the page HTML the viewer
-  downloads, then opens the print-ready tab.
+  downloads in memory-adaptive parts, then opens the print-ready tab for each
+  part.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -108,14 +109,41 @@ backgrounds and DocDown prints the full document with no hatch and no note.
 
 1. Open a work page on `academia.edu` and wait for the viewer.
 2. Click **Tải PDF** at the bottom-right.
-3. Check the preview, then click **Print / Save as PDF**.
+3. DocDown reads the viewer's page list and streams the pages into the print
+   tab in parts. Part 1 starts with a 16-page probe and then keeps filling the
+   part instead of stopping at the probe.
+4. Check part 1, click **Print / Save as PDF**, and choose **Save as PDF**.
+   Chrome suggests a name such as `Tài liệu - phần 1 (trang 1–256).pdf`.
+5. Click **Phần tiếp theo** in the same print tab to replace it with part 2,
+   then save it the same way, for example
+   `Tài liệu - phần 2 (trang 257–510).pdf`.
+6. On the last part, click **Ghép PDF**. In the merge page, select the part
+   PDFs you saved. DocDown checks the total page count and merges them locally
+   into one PDF; nothing is uploaded.
 
 Academia.edu sends each page of a work as HTML plus the fonts that page uses,
 all from `attachments.academia-assets.com`. DocDown rebuilds the text and the
-fonts from those pages, so the preview keeps the document's own layout. It never
-embeds the blurred or gated preview the site shows to visitors without access: a
-page Academia does not send is printed as a white page with a note. Documents
-over 300 pages are capped so the tab does not run out of memory.
+fonts from those pages, so each part keeps the document's own layout. There is
+no original-PDF fast path for logged-out users; DocDown only rebuilds the page
+HTML the viewer sends. It never embeds the blurred or gated preview the site
+shows to visitors without access: a page Academia does not send is printed as a
+white page with a note.
+
+There is no fixed 300-page cap. Each part holds at most 256 pages and shrinks,
+down to 32 pages, when memory is tight; a normal 510-page work becomes two
+parts, pages 1–256 and 257–510. DocDown estimates each part from markup, CSS,
+images, DOM node count and `performance.memory`. When RAM is low it
+automatically shrinks the next part, and after a failed part it resumes that
+part with a smaller size.
+Only one print tab is reused and only the current part is built in it; DocDown
+does not keep every part in memory at once.
+
+If the print tab is closed mid-part, click **Tải PDF** again. DocDown resumes
+from the first page of the unfinished part; parts you already saved are not
+rebuilt. Saving each part is a manual step in Chrome's print dialog—DocDown
+does not capture the dialog automatically. Merging is also manual: select the
+saved part PDFs on the merge page. `MAX_DOCUMENT_PAGES` 2000 is only a safety
+guard against corrupt metadata, not a page limit.
 
 ### Reset phiên
 
@@ -138,7 +166,7 @@ server never sends their content to non-subscribers.
 | `scribd.com` | rebuild from the viewer's page layers + print preview |
 | `slideshare.net` | slide images from `image.slidesharecdn.com` + print preview |
 | `coursehero.com` | preview pages rendered in the viewer; redacted areas marked |
-| `academia.edu` | rebuild from the viewer's page HTML + print preview |
+| `academia.edu` | rebuild from the viewer's page HTML in memory-adaptive parts + print preview + local part merge |
 
 ## Limits
 
@@ -154,9 +182,17 @@ server never sends their content to non-subscribers.
   redacted area is printed as a hatched block, never as a blurred image, and a
   page that mixes readable text with redacted artwork is labelled as partly
   readable rather than silently printed as if it were complete.
-- Academia.edu is rebuilt from the pages its viewer already downloads; pages the
-  site does not send, or only shows as a preview, are printed as white note pages
-  instead of being fabricated.
+- Academia.edu is rebuilt from the pages its viewer already downloads and has no
+  fixed page cap. Pages are streamed in memory-adaptive parts, at most 256 pages
+  per part and shrinking to as few as 32 when RAM is tight; a normal 510-page
+  work is two parts. Pages the site does not send, or only shows as a preview,
+  are printed as white note pages instead of being fabricated. Merging requires
+  selecting the saved part PDFs yourself on the merge page; the merged PDF is
+  produced locally and nothing is uploaded. Very large or heavy documents can
+  still fail in Chrome and are retried with smaller parts, so this is not a
+  guarantee of unlimited RAM. The merge page accepts up to 20 saved part PDFs in
+  one pass, so a document split into more parts cannot be merged into a single
+  PDF there.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 
@@ -166,6 +202,13 @@ server never sends their content to non-subscribers.
   2025-11-24 with no license file. The Studocu provider is an independent
   rewrite for the current Next.js viewer, so the MIT license below covers this
   repository only.
+- **pdf-lib 1.17.1** by Andrew Dillon, [MIT](https://github.com/Hopding/pdf-lib/blob/master/LICENSE.md),
+  vendored unmodified at `vendor/pdf-lib.min.js` (license in
+  `vendor/pdf-lib.LICENSE`). It is loaded only by `merge.html` to merge the
+  saved Academia part PDFs on your machine. The file is 525,099 bytes
+  (~513 KiB), an explicitly approved exception to the 100 KB bundle guideline;
+  it is never fetched at runtime, is not loaded by the other pages, the
+  background worker, or the content scripts, and adds no manifest permission.
 - Third-party agent skills: [`THIRD_PARTY_SKILLS.md`](THIRD_PARTY_SKILLS.md).
 
 ## Disclaimer

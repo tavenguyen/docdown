@@ -387,6 +387,288 @@
     }
   };
 
+  // Streaming counterpart to deliverPrintDocument. The print tab receives one
+  // skeleton document, then batches of pages, and finally renames the file.
+  // Only one request may be in flight so a late reply cannot settle the wrong
+  // promise.
+  ui.createPrintStream = function (win, handlers) {
+    if (!win || typeof win.postMessage !== 'function' || win.closed) {
+      throw new Error('Tab in không hợp lệ hoặc đã bị đóng.');
+    }
+    const targetOrigin = ui.printPageOrigin();
+    if (!targetOrigin) throw new Error('Không xác định được địa chỉ tab in.');
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      throw new Error('Không thể theo dõi tab in trong trang này.');
+    }
+
+    const PING_MS = 300;
+    const READY_TIMEOUT = 20000;
+    const RESPONSE_TIMEOUT = 120000;
+    const SHORT_TIMEOUT = 30000;
+    const CLOSED_CHECK_MS = 500;
+
+    const callbacks = handlers && typeof handlers === 'object' ? handlers : {};
+    let closed = false;
+    let closedNotified = false;
+    let readySeen = false;
+    let readyWait = null;
+    let pending = null;
+    let closedWatch = 0;
+
+    function notify(name, data) {
+      const handler = callbacks[name];
+      if (typeof handler !== 'function') return;
+      try {
+        handler(data);
+      } catch (error) {
+        DD.warn('Print stream handler failed', error);
+      }
+    }
+
+    function closedError() {
+      return new Error('Tab in đã bị đóng.');
+    }
+
+    function notifyClosed() {
+      if (closedNotified) return;
+      closedNotified = true;
+      notify('onClosed', {});
+    }
+
+    function updateWatch() {
+      if (closed || (!readyWait && !pending)) {
+        if (closedWatch) {
+          clearInterval(closedWatch);
+          closedWatch = 0;
+        }
+        return;
+      }
+      if (closedWatch) return;
+      closedWatch = setInterval(function () {
+        if (closed) return;
+        if (!win || win.closed) {
+          notifyClosed();
+          finishReady(closedError());
+          settlePending(closedError());
+        }
+      }, CLOSED_CHECK_MS);
+    }
+
+    function finishReady(error) {
+      if (!readyWait) return;
+      const waiter = readyWait;
+      readyWait = null;
+      clearTimeout(waiter.deadline);
+      clearInterval(waiter.pinger);
+      if (error) waiter.reject(error);
+      else waiter.resolve(true);
+      updateWatch();
+    }
+
+    function settlePending(error, data) {
+      if (!pending) return;
+      const request = pending;
+      pending = null;
+      clearTimeout(request.timer);
+      if (error) request.reject(error);
+      else request.resolve(data);
+      updateWatch();
+    }
+
+    function pumpPending() {
+      const request = pending;
+      if (!request || closed) return;
+      if (!win || win.closed) {
+        notifyClosed();
+        settlePending(closedError());
+        return;
+      }
+      try {
+        win.postMessage(request.message, targetOrigin);
+      } catch (error) {
+        settlePending(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      // A test double (or a very fast reply) may settle synchronously.
+      if (pending !== request) return;
+      clearTimeout(request.timer);
+      request.timer = setTimeout(function () {
+        if (pending !== request) return;
+        if (request.retries > 0) {
+          request.retries -= 1;
+          pumpPending();
+          return;
+        }
+        const error = request.kind === 'append'
+          ? new Error('Tab in không xác nhận phần trang sau 120 giây.')
+          : new Error('Tab in không phản hồi yêu cầu ' + request.kind + '.');
+        settlePending(error);
+      }, request.timeoutMs);
+    }
+
+    function request(kind, message, timeoutMs, retryOnTimeout, expected) {
+      if (closed) return Promise.reject(new Error('Kết nối tab in đã đóng.'));
+      if (pending) return Promise.reject(new Error('Tab in đang xử lý một yêu cầu khác.'));
+      if (!win || win.closed) {
+        notifyClosed();
+        return Promise.reject(closedError());
+      }
+      return new Promise(function (resolve, reject) {
+        pending = {
+          kind: kind,
+          expect: expected,
+          message: message,
+          timeoutMs: timeoutMs,
+          retries: retryOnTimeout ? 1 : 0,
+          timer: 0,
+          resolve: resolve,
+          reject: reject
+        };
+        pumpPending();
+        updateWatch();
+      });
+    }
+
+    function waitForReady(timeoutMs) {
+      const ms = Number(timeoutMs) > 0 ? Number(timeoutMs) : READY_TIMEOUT;
+      if (closed) return Promise.reject(new Error('Kết nối tab in đã đóng.'));
+      if (!win || win.closed) {
+        notifyClosed();
+        return Promise.reject(closedError());
+      }
+      if (readySeen) return Promise.resolve(true);
+      if (readyWait) return Promise.reject(new Error('Đang chờ tab in sẵn sàng.'));
+      return new Promise(function (resolve, reject) {
+        const waiter = { resolve: resolve, reject: reject, deadline: 0, pinger: 0 };
+        readyWait = waiter;
+
+        function ping() {
+          if (closed || readyWait !== waiter) return;
+          if (!win || win.closed) {
+            notifyClosed();
+            finishReady(closedError());
+            return;
+          }
+          try {
+            win.postMessage({ type: 'docdown-print-ping' }, targetOrigin);
+          } catch (error) {
+            finishReady(error instanceof Error ? error : new Error(String(error)));
+          }
+        }
+
+        waiter.deadline = setTimeout(function () {
+          finishReady(new Error('Tab in không phản hồi sau ' +
+            Math.round(ms / 1000) + ' giây.'));
+        }, ms);
+        waiter.pinger = setInterval(ping, PING_MS);
+        ping();
+        updateWatch();
+      });
+    }
+
+    function begin(payload) {
+      const data = payload && typeof payload === 'object' ? payload : {};
+      return request('begin', {
+        type: 'docdown-print-begin',
+        html: data.html,
+        title: data.title,
+        fileName: data.fileName,
+        part: data.part
+      }, SHORT_TIMEOUT, false, 'docdown-print-begun');
+    }
+
+    function append(payload) {
+      const data = payload && typeof payload === 'object' ? payload : {};
+      return request('append', {
+        type: 'docdown-print-append',
+        html: data.html,
+        css: data.css || '',
+        fromPage: data.fromPage,
+        toPage: data.toPage
+      }, RESPONSE_TIMEOUT, true, 'docdown-print-appended');
+    }
+
+    function finalize(payload) {
+      const data = payload && typeof payload === 'object' ? payload : {};
+      return request('final', {
+        type: 'docdown-print-final',
+        fileName: data.fileName,
+        fromPage: data.fromPage,
+        toPage: data.toPage,
+        hasNext: !!data.hasNext,
+        title: data.title,
+        totalPages: data.totalPages
+      }, RESPONSE_TIMEOUT, false, 'docdown-print-finalized');
+    }
+
+    function onMessage(event) {
+      if (closed) return;
+      if (event.source !== win) return;
+      if (event.origin !== targetOrigin) return;
+      const data = event.data;
+      if (!data || typeof data.type !== 'string') return;
+
+      if (data.type === 'docdown-print-ready') {
+        readySeen = true;
+        finishReady(null);
+        return;
+      }
+      if (data.type === 'docdown-print-next') {
+        notify('onNext', data);
+        return;
+      }
+      if (data.type === 'docdown-print-printed') {
+        notify('onPrinted', data);
+        return;
+      }
+      if (data.type === 'docdown-print-failed') {
+        const error = new Error(data.message ? String(data.message) : 'Tab in báo lỗi.');
+        error.stage = data.stage ? String(data.stage) : '';
+        settlePending(error);
+        notify('onFailed', data);
+        return;
+      }
+      if (pending && data.type === pending.expect) {
+        if (pending.kind === 'append' &&
+          (data.fromPage !== pending.message.fromPage ||
+            data.toPage !== pending.message.toPage)) {
+          // Ignore a late ack for a different batch; only the batch currently
+          // in flight may settle this request (retries resend the same range).
+          return;
+        }
+        settlePending(null, data);
+      }
+    }
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('pagehide', onPageHide);
+      if (closedWatch) {
+        clearInterval(closedWatch);
+        closedWatch = 0;
+      }
+      finishReady(new Error('Đã đóng kết nối tab in.'));
+      settlePending(new Error('Đã đóng kết nối tab in.'));
+    }
+
+    function onPageHide() {
+      close();
+    }
+
+    window.addEventListener('message', onMessage);
+    window.addEventListener('pagehide', onPageHide, { once: true });
+
+    return {
+      waitForReady: waitForReady,
+      begin: begin,
+      append: append,
+      finalize: finalize,
+      close: close
+    };
+  };
+
   ui.cleanup = function () {
     clearTimeout(state.toastTimer);
     clearTimeout(state.panelTimer);

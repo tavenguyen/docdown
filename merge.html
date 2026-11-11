@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocDown – Ghép PDF</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  body {
+    padding: 32px 16px;
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  .merge-card {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+  }
+
+  .brand {
+    margin: 0;
+    color: #16a34a;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 4px 0 8px;
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .lede {
+    margin: 0 0 24px;
+    color: #4b5563;
+  }
+
+  .document-info {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f9fafb;
+  }
+
+  .document-title {
+    margin: 0 0 4px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .expected-line {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  .expected-line strong {
+    color: #111827;
+  }
+
+  .file-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: 1.5px dashed #d1d5db;
+    border-radius: 12px;
+    background: #fff;
+    color: #374151;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  input[type="file"]:hover {
+    border-color: #16a34a;
+  }
+
+  input[type="file"]:focus-visible {
+    outline: 3px solid #bbf7d0;
+    outline-offset: 2px;
+  }
+
+  input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 8px 12px;
+    border: 1px solid #16a34a;
+    border-radius: 8px;
+    background: #f0fdf4;
+    color: #166534;
+    font: 700 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    cursor: pointer;
+  }
+
+  input[type="file"]::file-selector-button:hover {
+    background: #dcfce7;
+  }
+
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin: 24px 0 10px;
+  }
+
+  .summary {
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .part-badge {
+    flex: 0 0 auto;
+    min-width: 68px;
+    padding: 4px 8px;
+    border-radius: 9999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .part-badge.unknown {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .file-body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .file-name {
+    display: block;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .file-meta {
+    display: block;
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  .empty {
+    margin: 12px 0 0;
+    color: #9ca3af;
+    font-size: 14px;
+  }
+
+  .warnings {
+    margin: 16px 0 0;
+    padding: 10px 12px 10px 30px;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 13px;
+  }
+
+  .warnings li + li {
+    margin-top: 4px;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: #374151;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .check input {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 2px 0 0;
+    accent-color: #16a34a;
+  }
+
+  .primary {
+    min-width: 180px;
+    border: 0;
+    border-radius: 10px;
+    background: #16a34a;
+    color: #fff;
+    padding: 12px 20px;
+    font: 700 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    cursor: pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .primary:hover:not(:disabled) {
+    background: #15803d;
+  }
+
+  .primary:focus-visible {
+    outline: 3px solid #bbf7d0;
+    outline-offset: 2px;
+  }
+
+  .primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .status {
+    min-height: 22px;
+    margin: 16px 0 0;
+    color: #4b5563;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .status[data-tone="error"] {
+    color: #b91c1c;
+  }
+
+  .status[data-tone="success"] {
+    color: #15803d;
+    font-weight: 600;
+  }
+
+  @media (max-width: 600px) {
+    body {
+      padding: 16px 10px;
+    }
+
+    .merge-card {
+      padding: 22px 16px;
+      border-radius: 12px;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .primary {
+      width: 100%;
+    }
+
+    .file-item {
+      gap: 10px;
+    }
+
+    .part-badge {
+      min-width: 58px;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="merge-card">
+  <header>
+    <p class="brand">DocDown</p>
+    <h1>Ghép PDF</h1>
+    <p class="lede">
+      Chọn các file PDF đã lưu theo đúng thứ tự phần. DocDown đọc số phần trong
+      tên file, kiểm tra số trang rồi ghép thành một PDF ngay trên máy — không
+      tải file lên mạng.
+    </p>
+  </header>
+
+  <section class="document-info" aria-label="Thông tin tài liệu">
+    <p class="document-title" id="document-title">Tài liệu</p>
+    <p class="expected-line">
+      Tổng số trang dự kiến: <strong id="expected-total">Không rõ</strong>
+    </p>
+  </section>
+
+  <div>
+    <label class="file-label" for="files">Các phần PDF đã lưu</label>
+    <input id="files" type="file" accept="application/pdf,.pdf" multiple>
+  </div>
+
+  <section aria-labelledby="selected-heading">
+    <div class="section-head">
+      <h2 id="selected-heading">File đã chọn</h2>
+      <span class="summary" id="file-summary"></span>
+    </div>
+    <ol class="file-list" id="file-list" hidden></ol>
+    <p class="empty" id="empty-list">Chưa chọn file nào.</p>
+  </section>
+
+  <ul class="warnings" id="merge-warnings" aria-label="Cảnh báo" aria-live="polite" hidden></ul>
+
+  <div class="actions">
+    <label class="check">
+      <input id="skip-page-check" type="checkbox">
+      <span>Bỏ qua kiểm tra tổng số trang</span>
+    </label>
+    <button class="primary" id="merge-button" type="button" disabled>Ghép PDF</button>
+  </div>
+
+  <p class="status" id="merge-status" role="status" aria-live="polite">
+    Chọn file PDF để bắt đầu.
+  </p>
+</main>
+<script src="lib/core.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="merge.js"></script>
+</body>
+</html>

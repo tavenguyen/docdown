@@ -506,6 +506,8 @@ test('pageHtml wraps fetched pages and renders a note when a page is missing', (
   const missing = provider.pageHtml({ page_number: 3, width: 850, height: 1100 });
   assert.match(missing, /docdown-gated-page/);
   assert.match(missing, /Page 3 is unavailable/);
+  assert.match(missing, /data-page-no="3"/,
+    'a missing page keeps its page number so the stream count stays correct');
   assert.ok(!missing.includes('jpedal'), 'a missing page must not embed fetched markup');
 
   const preview = provider.pageHtml(
@@ -593,6 +595,35 @@ test('buildCss emits base rules once and strips unsafe CSS', () => {
   assert.ok(!/javascript\s*:/i.test(css), 'javascript URLs must be stripped');
 });
 
+test('buildCss with a shared Set prints base rules and repeated page rules once', () => {
+  const { provider } = loadAcademia();
+  const seen = new Set();
+  const pageCss = '.text_layer{position:absolute}';
+
+  const first = provider.buildCss(pageCss, seen);
+  assert.match(first, /@page\{size:auto;margin:0\}/);
+  assert.match(first, /\.docdown-academia-page\{position:relative/);
+  assert.match(first, /\.text_layer\{position:absolute\}/);
+  assert.equal(seen.has('@page{size:auto;margin:0}'), true);
+  assert.equal(seen.has('.docdown-academia-page{position:relative;overflow:hidden;background:#fff}'), true);
+  assert.equal(seen.has('.text_layer{position:absolute}'), true);
+
+  assert.equal(provider.buildCss(pageCss, seen), '',
+    'a repeated batch contributes no duplicate CSS');
+
+  const fresh = provider.buildCss(pageCss + '\n.text_layer{font-size:12px}', seen);
+  assert.match(fresh, /\.text_layer\{font-size:12px\}/);
+  assert.equal(fresh.includes('.text_layer{position:absolute}'), false,
+    'already printed page rules are not repeated');
+  assert.equal(fresh.includes('@page'), false,
+    'base rules are not repeated in later batches');
+
+  // Callers without a Set keep the old full-stylesheet behaviour.
+  const full = provider.buildCss(pageCss);
+  assert.match(full, /@page\{size:auto;margin:0\}/);
+  assert.match(full, /\.text_layer\{position:absolute\}/);
+});
+
 test('fetchPageDefs requests the same-origin viewer endpoint', async () => {
   const calls = [];
   const { provider } = loadAcademia({
@@ -641,4 +672,387 @@ test('fetchPageDefs rejects HTTP errors, invalid ids and malformed payloads', as
     fetch: async () => ({ ok: true, status: 200, json: async () => ({}) })
   });
   await assert.rejects(() => malformed.provider.fetchPageDefs(42289459), /không gửi trang nào/);
+});
+
+// ---------------------------------------------------------------------------
+// Streaming / multi-part planning (STREAM, planCapacity, planBatch, adjust)
+// ---------------------------------------------------------------------------
+
+const KB = 1024;
+const MB = 1024 * 1024;
+
+const EXPECTED_STREAM = {
+  PROBE_PAGES: 16,
+  BATCH_PAGES: 24,
+  BATCH_MAX_BYTES: 6 * MB,
+  PART_MAX_PAGES: 256,
+  PART_MIN_PAGES: 32,
+  PART_BUDGET_BYTES: 192 * MB,
+  DOM_FACTOR: 6,
+  NODE_BUDGET: 500000,
+  HEAP_BUDGET_BYTES: 256 * MB,
+  HEAP_SCALE: 2,
+  STATIC_CAPACITY: 150,
+  MAX_DOCUMENT_PAGES: 2000
+};
+
+function textProbe(pages) {
+  return {
+    pages: pages,
+    markupBytes: 60 * KB * pages,
+    cssBytes: 35 * KB * pages,
+    imageBytes: 0,
+    nodes: 1500 * pages
+  };
+}
+
+// Mirrors the part loop in providers/academia.js:startPart, but only the parts
+// that matter for partitioning: the first part owns the 16-page probe and then
+// keeps appending until the capacity is full. It is a test-only derivation; the
+// provider itself is not modified.
+function simulateParts(provider, totalPages, capacity, avgMarkupBytes) {
+  const parts = [];
+  let nextPage = 1;
+  let partIndex = 0;
+
+  while (nextPage <= totalPages) {
+    partIndex += 1;
+    const fromPage = nextPage;
+    let pagesInPart = 0;
+    let lastAppended = fromPage - 1;
+
+    if (partIndex === 1) {
+      const probeCount = Math.min(
+        provider.STREAM.PROBE_PAGES,
+        totalPages - fromPage + 1,
+        capacity
+      );
+      pagesInPart = probeCount;
+      lastAppended = fromPage + probeCount - 1;
+    }
+
+    while (pagesInPart < capacity && lastAppended < totalPages) {
+      const pagesLeft = totalPages - lastAppended;
+      const remainingInPart = capacity - pagesInPart;
+      const batchSize = provider.planBatch(remainingInPart, avgMarkupBytes, pagesLeft);
+      lastAppended += batchSize;
+      pagesInPart += batchSize;
+    }
+
+    parts.push({
+      partIndex: partIndex,
+      fromPage: fromPage,
+      toPage: lastAppended,
+      pages: pagesInPart
+    });
+    nextPage = lastAppended + 1;
+  }
+
+  return parts;
+}
+
+test('STREAM exposes the exact streaming budgets', () => {
+  const { provider } = loadAcademia();
+  assert.deepEqual({ ...provider.STREAM }, EXPECTED_STREAM);
+});
+
+test('planCapacity bounds a typical text probe by byte, node and heap caps', () => {
+  const { provider } = loadAcademia();
+  const pages = provider.STREAM.PROBE_PAGES;
+  const baseline = 100 * MB;
+  const heapLimit = 4 * 1024 * MB;
+  const probe = { ...textProbe(pages), heap: baseline };
+
+  // Low heap growth leaves the byte and node caps in control, so the part
+  // reaches the 256-page clamp.
+  assert.equal(
+    provider.planCapacity({ heap: baseline + 5 * MB, heapLimit: heapLimit }, probe),
+    provider.STREAM.PART_MAX_PAGES
+  );
+
+  // High heap growth is deliberately conservative: 50 MB over 16 pages means
+  // heapCap = floor(256 MB / (2 * 50 MB / 16)) = 40. This is the RAM guard
+  // doing its job, not a page-count bug.
+  const capacity = provider.planCapacity(
+    { heap: baseline + 50 * MB, heapLimit: heapLimit },
+    probe
+  );
+  assert.equal(capacity, 40);
+  assert.ok(capacity >= provider.STREAM.PART_MIN_PAGES);
+
+  // Without a heap sample the byte and node caps also allow all 256 pages.
+  assert.equal(provider.planCapacity({}, probe), provider.STREAM.PART_MAX_PAGES);
+});
+
+test('planCapacity ignores a negative heap delta after a GC', () => {
+  const { provider } = loadAcademia();
+  const pages = provider.STREAM.PROBE_PAGES;
+  const probe = { ...textProbe(pages), heap: 200 * MB };
+  const measure = { heap: 150 * MB, heapLimit: 4 * 1024 * MB };
+
+  const capacity = provider.planCapacity(measure, probe);
+
+  assert.ok(capacity > provider.STREAM.PART_MIN_PAGES,
+    'a negative heap delta must not force the part to the minimum');
+  assert.equal(capacity, provider.STREAM.PART_MAX_PAGES,
+    'the byte and node caps still allow the normal 256-page part');
+
+  const images = provider.planCapacity(measure, {
+    ...textProbe(pages),
+    heap: 200 * MB,
+    imageBytes: 8 * MB * pages
+  });
+  assert.equal(images, provider.STREAM.PART_MIN_PAGES,
+    'a negative heap delta falls back to the image byte cap');
+});
+
+test('planCapacity shrinks byte-heavy and node-heavy documents', () => {
+  const { provider } = loadAcademia();
+  const pages = provider.STREAM.PROBE_PAGES;
+
+  const images = provider.planCapacity({}, {
+    pages: pages,
+    markupBytes: 60 * KB * pages,
+    cssBytes: 35 * KB * pages,
+    imageBytes: 8 * MB * pages,
+    nodes: 1500 * pages
+  });
+  assert.equal(images, provider.STREAM.PART_MIN_PAGES,
+    '8 MB of images per page must fall to the minimum part size');
+  assert.ok(images <= 40);
+
+  const nodes = provider.planCapacity({}, {
+    pages: pages,
+    markupBytes: 60 * KB * pages,
+    cssBytes: 35 * KB * pages,
+    imageBytes: 0,
+    nodes: 50000 * pages
+  });
+  assert.equal(nodes, provider.STREAM.PART_MIN_PAGES,
+    '50k nodes per page must fall to the minimum part size');
+  assert.ok(nodes <= 64);
+});
+
+test('planCapacity falls back to STATIC_CAPACITY when it has no metrics', () => {
+  const { provider } = loadAcademia();
+
+  assert.equal(provider.planCapacity({}, { pages: 16 }), provider.STREAM.STATIC_CAPACITY);
+  assert.equal(provider.planCapacity(null, null), provider.STREAM.STATIC_CAPACITY);
+  assert.equal(provider.planCapacity({}, {}), provider.STREAM.STATIC_CAPACITY);
+  assert.equal(provider.planCapacity({}, { pages: 0, markupBytes: 1 }),
+    provider.STREAM.STATIC_CAPACITY);
+});
+
+test('planCapacity always clamps to PART_MIN_PAGES..PART_MAX_PAGES', () => {
+  const { provider } = loadAcademia();
+  const min = provider.STREAM.PART_MIN_PAGES;
+  const max = provider.STREAM.PART_MAX_PAGES;
+  const pages = provider.STREAM.PROBE_PAGES;
+
+  const probes = [
+    { pages: pages, markupBytes: 0, cssBytes: 0, imageBytes: 0, nodes: 0 },
+    { pages: pages, markupBytes: 1e15, cssBytes: 0, imageBytes: 0, nodes: 0 },
+    { pages: pages, markupBytes: 0, cssBytes: 1e15, imageBytes: 0, nodes: 0 },
+    { pages: pages, markupBytes: 0, cssBytes: 0, imageBytes: 1e15, nodes: 0 },
+    { pages: pages, markupBytes: 0, cssBytes: 0, imageBytes: 0, nodes: 1e15 },
+    { pages: pages, markupBytes: -1, cssBytes: -1, imageBytes: -1, nodes: -1 },
+    { pages: 1, markupBytes: 1, cssBytes: 1, imageBytes: 1, nodes: 1 }
+  ];
+  const measures = [
+    {},
+    { heap: 0, heapLimit: 0 },
+    { heap: 0, heapLimit: 100 },
+    { heap: 150 * MB, heapLimit: 4 * 1024 * MB }
+  ];
+
+  probes.forEach((probe) => {
+    measures.forEach((measure) => {
+      const capacity = provider.planCapacity(measure, { ...probe, heap: 100 * MB });
+      assert.ok(Number.isInteger(capacity), 'capacity must be an integer: ' + capacity);
+      assert.ok(capacity >= min && capacity <= max,
+        'capacity ' + capacity + ' escaped ' + min + '..' + max);
+    });
+  });
+});
+
+test('planBatch respects the default, byte, remaining and pages-left limits', () => {
+  const { provider } = loadAcademia();
+
+  assert.equal(provider.planBatch(100, 60 * KB, 100), provider.STREAM.BATCH_PAGES);
+  assert.equal(provider.planBatch(24, 60 * KB, 510), 24);
+  assert.equal(provider.planBatch(100, 1 * MB, 100), 6,
+    'a 6 MB batch holds six 1 MB pages');
+  assert.equal(provider.planBatch(10, 60 * KB, 100), 10, 'remaining room wins');
+  assert.equal(provider.planBatch(100, 60 * KB, 7), 7, 'pages left wins');
+  assert.equal(provider.planBatch(100, 0, 100), provider.STREAM.BATCH_PAGES);
+
+  for (const args of [
+    [0, 60 * KB, 100],
+    [100, 1e15, 100],
+    [100, 60 * KB, 0],
+    [NaN, 60 * KB, 100],
+    [100, 60 * KB, NaN]
+  ]) {
+    assert.equal(provider.planBatch(...args), 1, JSON.stringify(args));
+  }
+  assert.ok(provider.planBatch(100, NaN, 100) >= 1,
+    'a non-finite average must still return at least one page');
+});
+
+test('adjustCapacity shrinks under pressure, grows with headroom and keeps normal values', () => {
+  const { provider } = loadAcademia();
+
+  assert.equal(provider.adjustCapacity(256, { heap: 66, heapLimit: 100 }), 192);
+  assert.equal(provider.adjustCapacity(256, { heap: 34, heapLimit: 100 }), 256,
+    'growth is capped at PART_MAX_PAGES');
+  assert.equal(provider.adjustCapacity(100, { heap: 50, heapLimit: 100 }), 100);
+  assert.equal(provider.adjustCapacity(32, { heap: 99, heapLimit: 100 }), 32,
+    'shrink never goes below PART_MIN_PAGES');
+  assert.equal(provider.adjustCapacity(256, null), 256);
+  assert.equal(provider.adjustCapacity(256, { heap: NaN, heapLimit: 100 }), 256);
+});
+
+test('510 pages split into 256 + 254 and the 16-page probe joins the first part', () => {
+  const { provider } = loadAcademia();
+  const totalPages = 510;
+
+  const capacity = provider.planCapacity({}, textProbe(provider.STREAM.PROBE_PAGES));
+  assert.equal(capacity, provider.STREAM.PART_MAX_PAGES);
+
+  const parts = simulateParts(provider, totalPages, capacity, 60 * KB);
+
+  assert.equal(parts.length, 2);
+  assert.deepEqual(
+    parts.map((part) => [part.fromPage, part.toPage, part.pages]),
+    [[1, 256, 256], [257, 510, 254]]
+  );
+  assert.equal(parts[0].pages, 256, 'the first part is full, not just the probe');
+  assert.notEqual(parts[0].pages, provider.STREAM.PROBE_PAGES,
+    'the probe must not be finalized as its own part');
+  assert.equal(parts.some((part) => part.toPage === provider.STREAM.PROBE_PAGES), false);
+  assert.equal(parts[0].fromPage, 1);
+  assert.equal(parts[0].toPage, 256);
+});
+
+test('resuming a failed part keeps its part index instead of skipping it', async () => {
+  const pages = Array.from({ length: 50 }, (_, index) => pageDef(index + 1));
+  const { DD, provider } = loadAcademia({
+    attachment: 'Attachment_123',
+    title: 'Resume test',
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => pages
+    }),
+    DOMParser: class {
+      parseFromString() {
+        const root = makeNode('div', {
+          id: 'jpedal',
+          style: 'width:850px;height:1100px'
+        });
+        root.text = 'page';
+        return makeDocument(root);
+      }
+    }
+  });
+
+  DD.fetchText = async () => '<html></html>';
+  DD.buildPrintHtml = () => '<!doctype html><html><body></body></html>';
+
+  const beginCalls = [];
+  let handlers = null;
+  let failFirstPartTwo = true;
+  const win = { closed: false, postMessage() {} };
+  const stream = {
+    async waitForReady() { return true; },
+    async begin(payload) {
+      beginCalls.push(payload.part.index);
+      if (payload.part.index === 2 && failFirstPartTwo) {
+        failFirstPartTwo = false;
+        throw new Error('part 2 failed');
+      }
+      return {
+        type: 'docdown-print-begun',
+        partIndex: payload.part.index,
+        baseline: {
+          heap: 100 * MB,
+          heapLimit: 4 * 1024 * MB,
+          nodes: 100,
+          imageBytes: 0
+        }
+      };
+    },
+    async append(payload) {
+      const count = payload.toPage - payload.fromPage + 1;
+      return {
+        type: 'docdown-print-appended',
+        fromPage: payload.fromPage,
+        toPage: payload.toPage,
+        pages: count,
+        heap: 100 * MB,
+        heapLimit: 4 * 1024 * MB,
+        nodes: 100 + count * 1500,
+        imageBytes: count * 8 * MB,
+        markupBytes: count * 60 * KB
+      };
+    },
+    async finalize() {
+      return { type: 'docdown-print-finalized' };
+    },
+    close() {}
+  };
+
+  DD.ui = {
+    openPrintWindow: () => win,
+    createPrintStream: (target, callbacks) => {
+      handlers = callbacks;
+      return stream;
+    },
+    setState() {},
+    progress() {},
+    progressText() {},
+    toast() {},
+    showPrintError() {},
+    cleanup() {},
+    mount() {}
+  };
+
+  await provider.run();
+
+  assert.deepEqual(beginCalls, [1], 'the first run opens part 1');
+  assert.ok(handlers && typeof handlers.onNext === 'function');
+
+  handlers.onNext();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(beginCalls, [1, 2],
+    'the next-part action opens part 2 and fails');
+
+  await provider.run();
+
+  assert.deepEqual(beginCalls, [1, 2, 2],
+    'resuming retries part 2 instead of skipping to part 3');
+});
+
+test('preparePage reports positive markup, CSS, node and image metrics', () => {
+  const root = buildPageFixture();
+  const pageUrl = ASSET_BASE + '/3240049/1.html';
+  const { provider } = loadAcademia({
+    DOMParser: class {
+      parseFromString() { return makeDocument(root); }
+    }
+  });
+
+  const parts = provider.preparePage('<html>ignored by the stub</html>', pageUrl);
+  assert.ok(parts, 'preparePage must find #jpedal');
+
+  assert.equal(parts.width, 909);
+  assert.equal(parts.height, 1286);
+  assert.equal(parts.markupBytes, parts.markup.length);
+  assert.equal(parts.cssBytes, parts.css.length);
+  assert.ok(parts.markupBytes > 0, 'markupBytes must be positive');
+  assert.ok(parts.cssBytes > 0, 'cssBytes must be positive');
+  assert.equal(parts.imageCount, 1, 'only the allowlisted image is counted');
+  assert.equal(parts.nodeCount, 8,
+    'root + surviving img, links, svg image and divs');
+  assert.ok(parts.nodeCount > parts.imageCount);
 });
