@@ -784,6 +784,7 @@
 
   function createSessionStream(win) {
     return DD.ui.createPrintStream(win, {
+      onPrev: onPrintPrev,
       onNext: onPrintNext,
       onPrinted: onPrintPrinted,
       onFailed: onPrintFailed,
@@ -832,6 +833,8 @@
       fontCache: new Map(),
       nextPage: 1,
       partIndex: 0,
+      history: [],
+      cursor: 0,
       capacity: STREAM.PART_MAX_PAGES,
       avgMarkupBytes: 0,
       partCssBytes: 0,
@@ -839,7 +842,6 @@
       failedPages: new Set(),
       current: null,
       resume: null,
-      awaitingNext: false,
       failureHandled: false,
       win: null,
       stream: null
@@ -882,7 +884,7 @@
     return null;
   }
 
-  async function loadBatch(sess, defs, partIndex) {
+  async function loadBatch(sess, defs, partIndex, replay) {
     const total = defs.length;
     const fromPage = defs[0].page_number;
     const toPage = defs[total - 1].page_number;
@@ -895,8 +897,8 @@
       else sess.failedPages.add(def.page_number);
 
       DD.ui.progress(Math.min(sess.usableEnd, fromPage + done - 1), sess.totalPages,
-        'Đang tải phần ' + partIndex + ': ' + done + '/' + total +
-        ' trang (trang ' + fromPage + '–' + toPage + ')…');
+        (replay ? 'Đang dựng lại phần ' : 'Đang tải phần ') + partIndex + ': ' +
+        done + '/' + total + ' trang (trang ' + fromPage + '–' + toPage + ')…');
       return parts;
     });
   }
@@ -966,27 +968,104 @@
     return false;
   }
 
-  function onPrintNext() {
-    if (busy || !session || session.resume) return;
-    if (session.nextPage > session.usableEnd) return;
+  function historyAt(index) {
+    if (!session || !Array.isArray(session.history)) return null;
+    return session.history[index - 1] || null;
+  }
 
-    session.awaitingNext = false;
-    if (!session.win || !session.stream || session.win.closed) {
-      const stream = session.stream;
-      session.stream = null;
-      session.win = null;
-      session.resume = {
-        partStartPage: session.nextPage,
-        capacity: session.capacity || STREAM.PART_MAX_PAGES
+  function nextPartExists(sess) {
+    return !!(sess && sess.history[sess.cursor]) ||
+      !!(sess && sess.nextPage <= sess.usableEnd);
+  }
+
+  function resumeForTarget(target, capacity) {
+    return {
+      partStartPage: target.fromPage,
+      toPage: target.toPage || null,
+      replay: !!target.replay,
+      partIndex: target.index,
+      capacity: capacity,
+      fileName: target.fileName || ''
+    };
+  }
+
+  function onPrintNext(data) {
+    if (busy || !session || session.resume) return;
+    const sess = session;
+    const fromPart = Number(data && data.partIndex);
+    if (Number.isFinite(fromPart) && fromPart > 0 && fromPart !== sess.cursor) return;
+    const upcoming = sess.history[sess.cursor] || null;
+    if (!upcoming && sess.nextPage > sess.usableEnd) return;
+
+    if (!sess.win || !sess.stream || sess.win.closed) {
+      const stream = sess.stream;
+      const target = upcoming || {
+        index: sess.partIndex + 1,
+        fromPage: sess.nextPage,
+        toPage: null,
+        replay: false,
+        fileName: ''
       };
+      sess.stream = null;
+      sess.win = null;
+      sess.resume = resumeForTarget(target, sess.capacity);
       detachStream(stream);
       DD.ui.setState('ready', 'Tab in đã đóng. Bấm "Tải PDF" để mở lại và tiếp tục từ trang ' +
-        session.nextPage + '.');
+        target.fromPage + '.');
       return;
     }
 
     busy = true;
-    startPart(session.win, session.stream).then(function () {
+    const task = upcoming
+      ? startPart(sess.win, sess.stream, {
+        index: upcoming.index,
+        fromPage: upcoming.fromPage,
+        toPage: upcoming.toPage,
+        fileName: upcoming.fileName,
+        replay: true
+      })
+      : startPart(sess.win, sess.stream);
+    task.then(function () {
+      busy = false;
+    }, function (error) {
+      failSession(error, session && session.win);
+      busy = false;
+    });
+  }
+
+  function onPrintPrev(data) {
+    if (busy || !session || session.resume) return;
+    const sess = session;
+    const fromPart = Number(data && data.partIndex);
+    if (Number.isFinite(fromPart) && fromPart > 0 && fromPart !== sess.cursor) return;
+    const target = sess.history[sess.cursor - 2];
+    if (!target) return;
+
+    if (!sess.win || !sess.stream || sess.win.closed) {
+      const stream = sess.stream;
+      sess.stream = null;
+      sess.win = null;
+      sess.resume = resumeForTarget({
+        index: target.index,
+        fromPage: target.fromPage,
+        toPage: target.toPage,
+        replay: true,
+        fileName: target.fileName
+      }, target.toPage - target.fromPage + 1);
+      detachStream(stream);
+      DD.ui.setState('ready', 'Tab in đã đóng. Bấm "Tải PDF" để mở lại phần ' +
+        target.index + ' (trang ' + target.fromPage + '–' + target.toPage + ').');
+      return;
+    }
+
+    busy = true;
+    startPart(sess.win, sess.stream, {
+      index: target.index,
+      fromPage: target.fromPage,
+      toPage: target.toPage,
+      fileName: target.fileName,
+      replay: true
+    }).then(function () {
       busy = false;
     }, function (error) {
       failSession(error, session && session.win);
@@ -1000,9 +1079,11 @@
       ? printed
       : (session && session.partIndex) || 0;
     let message = partIndex ? 'Đã in phần ' + partIndex + '.' : 'Đã in xong.';
-    if (session && session.nextPage <= session.usableEnd) {
-      message += ' Bấm nút phần tiếp theo trong tab in để tải phần ' +
-        (session.partIndex + 1) + '.';
+    if (session && nextPartExists(session)) {
+      const next = session.history[session.cursor]
+        ? session.history[session.cursor].index
+        : session.partIndex + 1;
+      message += ' Bấm "Phần tiếp theo" trong tab in để mở phần ' + next + '.';
     } else {
       message += ' Bấm "Ghép PDF" trong tab in nếu cần ghép các phần.';
     }
@@ -1021,25 +1102,60 @@
 
     if (session) {
       const activeCurrent = session.current;
-      const current = activeCurrent || {
-        fromPage: session.nextPage,
-        capacity: session.capacity || STREAM.PART_MAX_PAGES
-      };
-      const capacity = Number(current.capacity) || STREAM.PART_MAX_PAGES;
+      const viewed = historyAt(session.cursor);
+      let resume = null;
+
+      if (activeCurrent) {
+        resume = {
+          partStartPage: activeCurrent.fromPage,
+          toPage: activeCurrent.toPage || null,
+          replay: !!activeCurrent.replay,
+          partIndex: activeCurrent.partIndex || session.partIndex,
+          capacity: activeCurrent.replay
+            ? Math.max(1, activeCurrent.toPage - activeCurrent.fromPage + 1)
+            : Math.max(1, Math.min(STREAM.PART_MAX_PAGES,
+              Number(activeCurrent.capacity) || STREAM.PART_MAX_PAGES)),
+          fileName: activeCurrent.fileName || ''
+        };
+      } else if (viewed && session.cursor < session.history.length) {
+        // The user closed the tab while reviewing an older part. Reopen that
+        // exact part instead of skipping forward.
+        resume = resumeForTarget({
+          index: viewed.index,
+          fromPage: viewed.fromPage,
+          toPage: viewed.toPage,
+          replay: true,
+          fileName: viewed.fileName
+        }, viewed.toPage - viewed.fromPage + 1);
+      } else if (session.nextPage <= session.usableEnd) {
+        resume = {
+          partStartPage: session.nextPage,
+          toPage: null,
+          replay: false,
+          partIndex: session.partIndex + 1,
+          capacity: session.capacity || STREAM.PART_MAX_PAGES,
+          fileName: ''
+        };
+      } else if (viewed) {
+        resume = resumeForTarget({
+          index: viewed.index,
+          fromPage: viewed.fromPage,
+          toPage: viewed.toPage,
+          replay: true,
+          fileName: viewed.fileName
+        }, viewed.toPage - viewed.fromPage + 1);
+      }
+
+      if (resume) session.resume = resume;
       session.failureHandled = true;
-      session.awaitingNext = false;
-      session.resume = {
-        partStartPage: current.fromPage,
-        capacity: Math.max(1, Math.min(STREAM.PART_MAX_PAGES, Math.floor(capacity))),
-        partIndex: activeCurrent
-          ? (activeCurrent.partIndex || session.partIndex)
-          : session.partIndex + 1
-      };
-      session.current = null;
+        session.current = null;
       session.stream = null;
       session.win = null;
+      const target = resume && resume.partStartPage
+        ? resume.partStartPage
+        : session.nextPage;
       DD.ui.setState('ready', 'Tab in đã đóng. Bấm "Tải PDF" để mở lại và tiếp tục từ trang ' +
-        current.fromPage + '.');
+        target + '.');
     }
 
     detachStream(stream);
@@ -1072,19 +1188,34 @@
 
     session.failureHandled = true;
     const activeCurrent = session.current;
-    const current = activeCurrent || {
-      fromPage: session.nextPage,
-      capacity: session.capacity || STREAM.PART_MAX_PAGES
-    };
-    const capacity = Number(current.capacity) || STREAM.PART_MAX_PAGES;
-    session.awaitingNext = false;
-    session.resume = {
-      partStartPage: current.fromPage,
-      capacity: Math.max(STREAM.PART_MIN_PAGES, Math.floor(capacity / 2)),
-      partIndex: activeCurrent
-        ? (activeCurrent.partIndex || session.partIndex)
-        : session.partIndex + 1
-    };
+    let resume;
+    if (activeCurrent && activeCurrent.replay && activeCurrent.toPage) {
+      resume = {
+        partStartPage: activeCurrent.fromPage,
+        toPage: activeCurrent.toPage,
+        replay: true,
+        partIndex: activeCurrent.partIndex || session.partIndex,
+        capacity: Math.max(1, activeCurrent.toPage - activeCurrent.fromPage + 1),
+        fileName: activeCurrent.fileName || ''
+      };
+    } else {
+      const current = activeCurrent || {
+        fromPage: session.nextPage,
+        capacity: session.capacity || STREAM.PART_MAX_PAGES
+      };
+      const capacity = Number(current.capacity) || STREAM.PART_MAX_PAGES;
+      resume = {
+        partStartPage: current.fromPage,
+        toPage: null,
+        replay: false,
+        partIndex: activeCurrent
+          ? (activeCurrent.partIndex || session.partIndex)
+          : session.partIndex + 1,
+        capacity: Math.max(STREAM.PART_MIN_PAGES, Math.floor(capacity / 2)),
+        fileName: ''
+      };
+    }
+    session.resume = resume;
     busy = false;
     DD.warn(message);
     DD.ui.setState('error', message);
@@ -1095,22 +1226,31 @@
     }
   }
 
-  async function startPart(win, stream) {
+  async function startPart(win, stream, target) {
     const sess = session;
-    if (!sess || !win || !stream || sess.nextPage > sess.usableEnd) return;
+    if (!sess || !win || !stream || (!target && sess.nextPage > sess.usableEnd)) return;
+
+    const replay = !!(target && target.replay);
+    const partIndex = replay ? Number(target.index) : sess.partIndex + 1;
+    const fromPage = replay ? Number(target.fromPage) : sess.nextPage;
+    const fixedEnd = replay ? Number(target.toPage) : 0;
+    if (!Number.isFinite(partIndex) || partIndex < 1 ||
+      !Number.isFinite(fromPage) || fromPage < 1 ||
+      fromPage > sess.usableEnd) return;
+    if (replay && (!Number.isFinite(fixedEnd) || fixedEnd < fromPage)) return;
 
     sess.failureHandled = false;
-    sess.partIndex += 1;
-    const partIndex = sess.partIndex;
-    const fromPage = sess.nextPage;
-    let capacity = Number(sess.capacity) > 0
-      ? Math.floor(sess.capacity)
-      : STREAM.PART_MAX_PAGES;
+    let capacity = replay
+      ? fixedEnd - fromPage + 1
+      : (Number(sess.capacity) > 0 ? Math.floor(sess.capacity) : STREAM.PART_MAX_PAGES);
     capacity = Math.max(1, Math.min(STREAM.PART_MAX_PAGES, capacity));
     sess.current = {
       fromPage: fromPage,
       capacity: capacity,
-      partIndex: partIndex
+      partIndex: partIndex,
+      toPage: replay ? fixedEnd : null,
+      replay: replay,
+      fileName: replay ? (target.fileName || '') : ''
     };
     sess.partMarkupBytes = 0;
     sess.partCssBytes = 0;
@@ -1126,8 +1266,9 @@
       part: { index: partIndex, fromPage: fromPage, totalPages: sess.totalPages }
     });
 
-    DD.ui.setState('working', 'Đang mở phần ' + partIndex +
-      ' (từ trang ' + fromPage + ')…');
+    DD.ui.setState('working', replay
+      ? 'Đang dựng lại phần ' + partIndex + ' (trang ' + fromPage + '–' + fixedEnd + ')…'
+      : 'Đang mở phần ' + partIndex + ' (từ trang ' + fromPage + ')…');
     const begun = await stream.begin({
       html: skeleton,
       title: title,
@@ -1143,9 +1284,9 @@
       ? Number(sess.avgMarkupBytes)
       : 0;
 
-    // Only the first part probes. Later parts reuse the calibrated capacity
-    // and the previous part's average markup.
-    if (partIndex === 1) {
+    // Only a new first part probes. A replay already knows its exact range and
+    // must not re-plan or change the part boundaries.
+    if (!replay && partIndex === 1) {
       const probeCount = Math.min(
         STREAM.PROBE_PAGES,
         sess.usableEnd - fromPage + 1,
@@ -1189,53 +1330,82 @@
       }
     }
 
-    while (pagesInPart < capacity && lastAppended < sess.usableEnd &&
-      !budgetExceeded(lastAck, sess.partMarkupBytes, sess.partCssBytes)) {
-      const pagesLeft = sess.usableEnd - lastAppended;
-      const remainingInPart = capacity - pagesInPart;
-      if (remainingInPart < 1 || pagesLeft < 1) break;
-
-      const batchSize = planBatch(remainingInPart, averageMarkup, pagesLeft);
-      const startPage = lastAppended + 1;
-      const endPage = Math.min(sess.usableEnd, startPage + batchSize - 1);
-      const batchDefs = defsForPageRange(sess, startPage, endPage);
-      if (!batchDefs.length) break;
-
-      const batchParts = await loadBatch(sess, batchDefs, partIndex);
-      const batchResult = await appendBatch(
-        sess,
-        stream,
-        batchDefs,
-        batchParts,
-        batchDefs[0].page_number,
-        batchDefs[batchDefs.length - 1].page_number
-      );
-      const previousPages = pagesInPart;
-      pagesInPart += batchDefs.length;
-      lastAppended = endPage;
-      lastAck = batchResult.ack;
-      sess.partMarkupBytes += batchResult.markupTotal;
-      sess.partCssBytes += batchResult.cssTotal;
-
-      const batchAverage = batchAverageMarkup(
-        lastAck,
-        batchDefs.length,
-        batchResult.markupTotal
-      );
-      if (batchAverage > 0) {
-        averageMarkup = previousPages > 0
-          ? ((averageMarkup * previousPages) + (batchAverage * batchDefs.length)) / pagesInPart
-          : batchAverage;
-        sess.avgMarkupBytes = averageMarkup;
+    if (replay) {
+      let page = fromPage;
+      while (page <= fixedEnd) {
+        const endPage = Math.min(fixedEnd, page + STREAM.BATCH_PAGES - 1);
+        const batchDefs = defsForPageRange(sess, page, endPage);
+        const batchParts = await loadBatch(sess, batchDefs, partIndex, true);
+        const batchResult = await appendBatch(
+          sess,
+          stream,
+          batchDefs,
+          batchParts,
+          batchDefs[0].page_number,
+          batchDefs[batchDefs.length - 1].page_number
+        );
+        pagesInPart += batchDefs.length;
+        lastAppended = endPage;
+        lastAck = batchResult.ack;
+        sess.partMarkupBytes += batchResult.markupTotal;
+        sess.partCssBytes += batchResult.cssTotal;
+        page = endPage + 1;
       }
-      sess.current.capacity = capacity;
+    } else {
+      while (pagesInPart < capacity && lastAppended < sess.usableEnd &&
+        !budgetExceeded(lastAck, sess.partMarkupBytes, sess.partCssBytes)) {
+        const pagesLeft = sess.usableEnd - lastAppended;
+        const remainingInPart = capacity - pagesInPart;
+        if (remainingInPart < 1 || pagesLeft < 1) break;
+
+        const batchSize = planBatch(remainingInPart, averageMarkup, pagesLeft);
+        const startPage = lastAppended + 1;
+        const endPage = Math.min(sess.usableEnd, startPage + batchSize - 1);
+        const batchDefs = defsForPageRange(sess, startPage, endPage);
+        if (!batchDefs.length) break;
+
+        const batchParts = await loadBatch(sess, batchDefs, partIndex);
+        const batchResult = await appendBatch(
+          sess,
+          stream,
+          batchDefs,
+          batchParts,
+          batchDefs[0].page_number,
+          batchDefs[batchDefs.length - 1].page_number
+        );
+        const previousPages = pagesInPart;
+        pagesInPart += batchDefs.length;
+        lastAppended = endPage;
+        lastAck = batchResult.ack;
+        sess.partMarkupBytes += batchResult.markupTotal;
+        sess.partCssBytes += batchResult.cssTotal;
+
+        const batchAverage = batchAverageMarkup(
+          lastAck,
+          batchDefs.length,
+          batchResult.markupTotal
+        );
+        if (batchAverage > 0) {
+          averageMarkup = previousPages > 0
+            ? ((averageMarkup * previousPages) + (batchAverage * batchDefs.length)) / pagesInPart
+            : batchAverage;
+          sess.avgMarkupBytes = averageMarkup;
+        }
+        sess.current.capacity = capacity;
+      }
     }
 
     sess.avgMarkupBytes = averageMarkup;
     const endPage = lastAppended;
-    const hasNext = endPage < sess.usableEnd;
-    const fileName = DD.buildFileName(title) + ' - phần ' + partIndex +
-      ' (trang ' + fromPage + '–' + endPage + ')';
+    const hasPrev = partIndex > 1;
+    const hasNext = replay
+      ? (partIndex < sess.history.length || endPage < sess.usableEnd)
+      : endPage < sess.usableEnd;
+    const fileName = replay
+      ? (target.fileName || (DD.buildFileName(title) + ' - phần ' + partIndex +
+        ' (trang ' + fromPage + '–' + endPage + ')'))
+      : (DD.buildFileName(title) + ' - phần ' + partIndex +
+        ' (trang ' + fromPage + '–' + endPage + ')');
 
     DD.ui.setState('working', 'Đang chốt phần ' + partIndex +
       ' (trang ' + fromPage + '–' + endPage + ')…');
@@ -1244,14 +1414,24 @@
       fromPage: fromPage,
       toPage: endPage,
       hasNext: hasNext,
+      hasPrev: hasPrev,
       title: title,
       totalPages: sess.totalPages
     });
 
-    sess.nextPage = endPage + 1;
-    sess.capacity = adjustCapacity(capacity, lastAck);
+    if (!replay) {
+      sess.nextPage = endPage + 1;
+      sess.partIndex = partIndex;
+      sess.capacity = adjustCapacity(capacity, lastAck);
+      sess.history[partIndex - 1] = {
+        index: partIndex,
+        fromPage: fromPage,
+        toPage: endPage,
+        fileName: fileName
+      };
+    }
+    sess.cursor = partIndex;
     sess.current = null;
-    sess.awaitingNext = hasNext;
 
     if (!hasNext) {
       const failedCount = sess.failedPages ? sess.failedPages.size : 0;
@@ -1264,17 +1444,16 @@
       }
       message += '. Bấm "Ghép PDF" trong tab in để ghép các phần.';
 
-      sess.byNumber.clear();
-      if (sess.fontCache) sess.fontCache.clear();
-      session = null;
-
-      DD.ui.progress(endPage, Math.max(endPage, totalPages), message);
-      DD.ui.setState('ready', message);
+      DD.ui.setState('idle');
+      DD.ui.toast(message, 'success', { duration: 10000 });
       return;
     }
 
-    const message = 'Đã tạo phần ' + partIndex + ' (trang ' + fromPage + '–' + endPage +
-      '). Bấm nút phần tiếp theo trong tab in để tải phần ' + (partIndex + 1) + '.';
+    const message = replay
+      ? 'Đã dựng lại phần ' + partIndex + ' (trang ' + fromPage + '–' + endPage +
+        '). Bấm "Phần tiếp theo" trong tab in để mở phần ' + (partIndex + 1) + '.'
+      : 'Đã tạo phần ' + partIndex + ' (trang ' + fromPage + '–' + endPage +
+        '). Bấm "Phần tiếp theo" trong tab in để tải phần ' + (partIndex + 1) + '.';
     DD.ui.progress(endPage, Math.max(endPage, sess.totalPages), message);
     DD.ui.setState('ready', message);
   }
@@ -1284,15 +1463,19 @@
     busy = true;
     unloading = false;
 
-    if (session && session.awaitingNext) {
-      if (session.win && !session.win.closed) {
+    // When the tab is still open, the toolbar owns navigation. Do not start a
+    // new part from the FAB; after a failure the resume state explicitly allows
+    // a retry.
+    if (session && session.win && !session.win.closed && !session.resume) {
+      if (session.cursor > 0) {
+        const hasNext = nextPartExists(session);
         busy = false;
-        DD.ui.setState('ready', 'Phần ' + session.partIndex +
-          ' đã sẵn sàng. Bấm "Phần tiếp theo" trong tab in để tải phần ' +
-          (session.partIndex + 1) + '.');
+        DD.ui.setState('ready', hasNext
+          ? 'Phần ' + session.cursor + ' đã sẵn sàng. Bấm "Phần tiếp theo" trong tab in để mở phần ' +
+            (session.history[session.cursor] ? session.history[session.cursor].index : session.partIndex + 1) + '.'
+          : 'Phần cuối đã sẵn sàng. Bấm "Ghép PDF" trong tab in để ghép các phần.');
         return;
       }
-      session.awaitingNext = false;
     }
 
     let win = session && session.win && !session.win.closed ? session.win : null;
@@ -1340,30 +1523,86 @@
         activeStream = session.stream;
       }
 
+      if (win.closed) throw new Error('Tab in đã bị đóng trước khi bắt đầu.');
+      await session.stream.waitForReady();
+
+      if (!session.resume && session.history.length) {
+        // The tab was closed without the onClosed callback. Reopen the part the
+        // user was viewing, or continue with the next unseen part.
+        const viewed = historyAt(session.cursor);
+        if (session.cursor < session.history.length) {
+          session.resume = resumeForTarget({
+            index: viewed.index,
+            fromPage: viewed.fromPage,
+            toPage: viewed.toPage,
+            replay: true,
+            fileName: viewed.fileName
+          }, viewed.toPage - viewed.fromPage + 1);
+        } else if (session.nextPage <= session.usableEnd) {
+          session.resume = {
+            partStartPage: session.nextPage,
+            toPage: null,
+            replay: false,
+            partIndex: session.partIndex + 1,
+            capacity: session.capacity || STREAM.PART_MAX_PAGES,
+            fileName: ''
+          };
+        } else if (viewed) {
+          session.resume = resumeForTarget({
+            index: viewed.index,
+            fromPage: viewed.fromPage,
+            toPage: viewed.toPage,
+            replay: true,
+            fileName: viewed.fileName
+          }, viewed.toPage - viewed.fromPage + 1);
+        }
+      }
+
       if (session.resume) {
-        const resumePage = Number(session.resume.partStartPage);
+        const resume = session.resume;
+        session.current = null;
+        session.resume = null;
+            session.failureHandled = false;
+
+        if (resume.replay && Number(resume.toPage) >= Number(resume.partStartPage)) {
+          const index = Number(resume.partIndex);
+          const stored = historyAt(index);
+          await startPart(win, session.stream, stored
+            ? {
+              index: stored.index,
+              fromPage: stored.fromPage,
+              toPage: stored.toPage,
+              fileName: stored.fileName,
+              replay: true
+            }
+            : {
+              index: index,
+              fromPage: Number(resume.partStartPage),
+              toPage: Number(resume.toPage),
+              fileName: resume.fileName || '',
+              replay: true
+            });
+          return;
+        }
+
+        const resumePage = Number(resume.partStartPage);
         session.nextPage = Number.isFinite(resumePage) && resumePage > 0
           ? Math.min(session.usableEnd, Math.floor(resumePage))
           : session.nextPage;
-        const resumeCapacity = Number(session.resume.capacity);
+        const resumeCapacity = Number(resume.capacity);
         if (Number.isFinite(resumeCapacity) && resumeCapacity > 0) {
           session.capacity = Math.max(1, Math.min(STREAM.PART_MAX_PAGES,
             Math.floor(resumeCapacity)));
         }
-        const resumePartIndex = Number(session.resume.partIndex);
+        const resumePartIndex = Number(resume.partIndex);
         if (Number.isFinite(resumePartIndex) && resumePartIndex > 0) {
           // startPart() increments the part index, so restore one less to
           // resume the same failed/closed part instead of skipping it.
           session.partIndex = Math.max(0, Math.floor(resumePartIndex) - 1);
         }
-        session.current = null;
-        session.resume = null;
-        session.awaitingNext = false;
       }
-      session.failureHandled = false;
 
-      if (win.closed) throw new Error('Tab in đã bị đóng trước khi bắt đầu.');
-      await session.stream.waitForReady();
+      session.failureHandled = false;
       await startPart(win, session.stream);
     } catch (error) {
       failSession(error, win);

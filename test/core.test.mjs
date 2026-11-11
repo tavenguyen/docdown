@@ -380,6 +380,20 @@ test('buildPrintHtml shows the PDF file name in the preview toolbar', () => {
   assert.match(html, /<title>Đề Cương/);
 });
 
+test('buildPrintHtml adds previous, next and merge controls for a streamed part', () => {
+  const html = SH.buildPrintHtml({
+    title: 'Tài liệu',
+    pagesHtml: '',
+    total: 510,
+    part: { index: 2, fromPage: 257, totalPages: 510 }
+  });
+
+  assert.match(html, /id="docdown-prev"[^>]*hidden>Phần trước<\/button>/);
+  assert.match(html, /id="docdown-next"[^>]*hidden>Phần tiếp theo<\/button>/);
+  assert.match(html, /id="docdown-merge"[^>]*hidden>Ghép PDF<\/button>/);
+  assert.match(html, /id="docdown-toolbar-meta">Trang 257 \/ 510 · phần 2/);
+});
+
 test('isAllowedPrintOrigin accepts only supported document origins', () => {
   assert.equal(SH.isAllowedPrintOrigin('https://www.studocu.vn'), true);
   assert.equal(SH.isAllowedPrintOrigin('https://studocu.com'), true);

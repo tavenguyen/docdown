@@ -210,6 +210,15 @@
       });
     }
 
+    const prevButton = document.getElementById('docdown-prev');
+    if (prevButton) {
+      prevButton.addEventListener('click', function () {
+        post({ type: PREFIX + '-prev', partIndex: currentPartIndex });
+        prevButton.disabled = true;
+        prevButton.textContent = 'Đang dựng lại phần trước…';
+      });
+    }
+
     const nextButton = document.getElementById('docdown-next');
     if (nextButton) {
       nextButton.addEventListener('click', function () {
@@ -297,6 +306,8 @@
 
     const printButton = document.getElementById('docdown-print');
     if (printButton) printButton.disabled = true;
+    const prevButton = document.getElementById('docdown-prev');
+    if (prevButton) prevButton.hidden = true;
     const nextButton = document.getElementById('docdown-next');
     if (nextButton) nextButton.hidden = true;
     const mergeButton = document.getElementById('docdown-merge');
@@ -406,6 +417,7 @@
     const toPage = Number(data.toPage);
     const totalPages = Number(data.totalPages);
     const hasNext = !!data.hasNext;
+    const hasPrev = !!data.hasPrev;
 
     currentFileName = String(data.fileName || currentFileName || 'document');
     currentTitle = String(data.title || currentTitle || '');
@@ -432,13 +444,18 @@
     const printButton = document.getElementById('docdown-print');
     if (printButton) printButton.disabled = false;
 
+    const prevButton = document.getElementById('docdown-prev');
+    if (prevButton) {
+      prevButton.hidden = !hasPrev;
+      prevButton.disabled = !hasPrev;
+      prevButton.textContent = 'Phần trước';
+    }
+
     const nextButton = document.getElementById('docdown-next');
     if (nextButton) {
       nextButton.hidden = !hasNext;
-      if (hasNext) {
-        nextButton.disabled = false;
-        nextButton.textContent = 'Phần tiếp theo';
-      }
+      nextButton.disabled = !hasNext;
+      nextButton.textContent = 'Phần tiếp theo';
     }
 
     const mergeButton = document.getElementById('docdown-merge');

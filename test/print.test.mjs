@@ -82,8 +82,10 @@ function createPrintContext(options) {
 
   const printButton = createButton('docdown-print');
   const closeButton = createButton('docdown-close');
+  const prevButton = createButton('docdown-prev');
   const nextButton = createButton('docdown-next');
   const mergeButton = createButton('docdown-merge');
+  prevButton.hidden = true;
   nextButton.hidden = true;
   mergeButton.hidden = true;
 
@@ -222,6 +224,7 @@ function createPrintContext(options) {
     state,
     printButton,
     closeButton,
+    prevButton,
     nextButton,
     mergeButton,
     documentStub,
@@ -529,6 +532,42 @@ test('clicking next posts docdown-print-next once and disables the button', asyn
   assert.equal(next[0].partIndex, 1);
   assert.equal(ctx.nextButton.disabled, true);
   assert.equal(ctx.nextButton.textContent, 'Đang chuẩn bị phần tiếp theo…');
+});
+
+test('a replayed part shows the previous button and posts docdown-print-prev', async () => {
+  const ctx = createPrintContext();
+  beginStream(ctx, {
+    title: 'Tài liệu thử',
+    fileName: 'Tài liệu thử - phần 2',
+    part: { index: 2, fromPage: 257, totalPages: 510 }
+  });
+  await wait(20);
+
+  ctx.deliver(ACADEMIA_ORIGIN, {
+    type: 'docdown-print-final',
+    fileName: 'Tài liệu thử - phần 2 (trang 257–510)',
+    fromPage: 257,
+    toPage: 510,
+    hasPrev: true,
+    hasNext: false,
+    title: 'Tài liệu thử',
+    totalPages: 510
+  });
+  await wait(30);
+
+  assert.equal(ctx.prevButton.hidden, false, 'previous is shown after part 1');
+  assert.equal(ctx.prevButton.disabled, false);
+  assert.equal(ctx.prevButton.textContent, 'Phần trước');
+  assert.equal(ctx.nextButton.hidden, true);
+  assert.equal(ctx.mergeButton.hidden, false);
+
+  ctx.prevButton.click();
+
+  const prev = ctx.posts.filter((message) => message.type === 'docdown-print-prev');
+  assert.equal(prev.length, 1);
+  assert.equal(prev[0].partIndex, 2);
+  assert.equal(ctx.prevButton.disabled, true);
+  assert.equal(ctx.prevButton.textContent, 'Đang dựng lại phần trước…');
 });
 
 test('document.open drops window listeners and repeated begins handle each event once', async () => {

@@ -35,10 +35,44 @@ function createWindowStub() {
 
 function loadUi(timers) {
   const windowStub = createWindowStub();
+  const elements = new Map();
+  const documentStub = {
+    body: {
+      appendChild(element) {
+        if (element && element.id) elements.set(element.id, element);
+        return element;
+      }
+    },
+    getElementById(id) {
+      return elements.get(id) || null;
+    },
+    createElement(tagName) {
+      const classes = new Set();
+      const element = {
+        tagName: String(tagName).toUpperCase(),
+        id: '',
+        className: '',
+        textContent: '',
+        hidden: false,
+        removed: false,
+        classList: {
+          add(name) { classes.add(name); },
+          remove(name) { classes.delete(name); },
+          contains(name) { return classes.has(name); }
+        },
+        setAttribute() {},
+        remove() {
+          element.removed = true;
+          if (element.id) elements.delete(element.id);
+        }
+      };
+      return element;
+    }
+  };
   const context = {
     console,
     window: windowStub,
-    document: { body: {} },
+    document: documentStub,
     chrome: {
       runtime: {
         getURL: (path) => 'chrome-extension://abc/' + path
@@ -57,7 +91,7 @@ function loadUi(timers) {
   vm.runInContext(CORE_SOURCE, context, { filename: 'core.js' });
   vm.runInContext(UI_SOURCE, context, { filename: 'ui.js' });
 
-  return { DD: context.DocDown, windowStub, context };
+  return { DD: context.DocDown, windowStub, context, documentStub };
 }
 
 function createPrintWindow() {
@@ -86,6 +120,24 @@ function reply(windowStub, win, origin, data, source, eventOrigin) {
     data: data
   });
 }
+
+test('toast honours an explicit 10 second duration', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const timers = { setTimeout, clearTimeout, setInterval, clearInterval };
+  const { DD, documentStub } = loadUi(timers);
+
+  DD.ui.toast('Đã tạo phần cuối', 'success', { duration: 10000 });
+  const toast = documentStub.getElementById('docdown-toast');
+  assert.ok(toast);
+  assert.equal(toast.classList.contains('docdown-toast-hide'), false);
+
+  t.mock.timers.tick(9999);
+  assert.equal(toast.classList.contains('docdown-toast-hide'), false);
+  t.mock.timers.tick(1);
+  assert.equal(toast.classList.contains('docdown-toast-hide'), true);
+  t.mock.timers.tick(300);
+  assert.equal(toast.removed, true);
+});
 
 test('waitForReady pings the print tab until it reports ready', async () => {
   const { windowStub, win, stream, origin } = createStream();
@@ -264,6 +316,7 @@ test('finalize waits for the finalized response type, not just any reply', async
     fromPage: 1,
     toPage: 10,
     hasNext: true,
+    hasPrev: false,
     title: 'Tài liệu thử',
     totalPages: 20
   });
@@ -292,11 +345,13 @@ test('finalize waits for the finalized response type, not just any reply', async
 test('next, printed and failed events reach their handlers', async () => {
   const seen = {};
   const { windowStub, win, stream, origin } = createStream({
+    onPrev(data) { seen.prev = data; },
     onNext(data) { seen.next = data; },
     onPrinted(data) { seen.printed = data; },
     onFailed(data) { seen.failed = data; }
   });
 
+  reply(windowStub, win, origin, { type: 'docdown-print-prev', partIndex: 2 });
   reply(windowStub, win, origin, { type: 'docdown-print-next', partIndex: 2 });
   reply(windowStub, win, origin, { type: 'docdown-print-printed', partIndex: 2 });
 
@@ -310,6 +365,7 @@ test('next, printed and failed events reach their handlers', async () => {
   const error = await pending.then(() => null, (reason) => reason);
   assert.equal(error && error.message, 'boom');
   assert.equal(error && error.stage, 'append');
+  assert.equal(seen.prev.partIndex, 2);
   assert.equal(seen.next.partIndex, 2);
   assert.equal(seen.printed.partIndex, 2);
   assert.equal(seen.failed.stage, 'append');

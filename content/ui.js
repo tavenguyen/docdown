@@ -26,6 +26,7 @@
   const state = {
     provider: null,
     toastTimer: 0,
+    toastRemoveTimer: 0,
     panelTimer: 0,
     resetTimer: 0,
     resetArmed: false
@@ -261,7 +262,7 @@
     if (message) ui.progressText(message);
   };
 
-  ui.toast = function (message, type) {
+  ui.toast = function (message, type, options) {
     let toast = document.getElementById(IDS.toast);
     if (!toast) {
       toast = document.createElement('div');
@@ -271,11 +272,14 @@
     }
     toast.className = 'docdown-toast' + (type ? ' docdown-toast-' + type : '');
     toast.textContent = String(message || '');
+    const requested = options && Number(options.duration);
+    const duration = Number.isFinite(requested) && requested > 0 ? requested : 6000;
     clearTimeout(state.toastTimer);
+    clearTimeout(state.toastRemoveTimer);
     state.toastTimer = setTimeout(function () {
       toast.classList.add('docdown-toast-hide');
-      setTimeout(function () { toast.remove(); }, 300);
-    }, 6000);
+      state.toastRemoveTimer = setTimeout(function () { toast.remove(); }, 300);
+    }, duration);
   };
 
   ui.printPageUrl = function () {
@@ -596,6 +600,7 @@
         fromPage: data.fromPage,
         toPage: data.toPage,
         hasNext: !!data.hasNext,
+        hasPrev: !!data.hasPrev,
         title: data.title,
         totalPages: data.totalPages
       }, RESPONSE_TIMEOUT, false, 'docdown-print-finalized');
@@ -611,6 +616,10 @@
       if (data.type === 'docdown-print-ready') {
         readySeen = true;
         finishReady(null);
+        return;
+      }
+      if (data.type === 'docdown-print-prev') {
+        notify('onPrev', data);
         return;
       }
       if (data.type === 'docdown-print-next') {
@@ -671,6 +680,7 @@
 
   ui.cleanup = function () {
     clearTimeout(state.toastTimer);
+    clearTimeout(state.toastRemoveTimer);
     clearTimeout(state.panelTimer);
     clearTimeout(state.resetTimer);
     state.resetTimer = 0;

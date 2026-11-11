@@ -1033,6 +1033,147 @@ test('resuming a failed part keeps its part index instead of skipping it', async
     'resuming retries part 2 instead of skipping to part 3');
 });
 
+test('history can replay the previous part without duplicating page ranges', async () => {
+  const pages = Array.from({ length: 510 }, (_, index) => pageDef(index + 1));
+  const { DD, provider } = loadAcademia({
+    attachment: 'Attachment_123',
+    title: 'History test',
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => pages
+    }),
+    DOMParser: class {
+      parseFromString() {
+        const root = makeNode('div', {
+          id: 'jpedal',
+          style: 'width:850px;height:1100px'
+        });
+        root.text = 'page';
+        return makeDocument(root);
+      }
+    }
+  });
+
+  DD.fetchText = async () => '<html></html>';
+  DD.buildPrintHtml = () => '<!doctype html><html><body></body></html>';
+
+  const begins = [];
+  const appends = [];
+  const finals = [];
+  const toasts = [];
+  let handlers = null;
+  let currentPart = 0;
+  const win = { closed: false, postMessage() {} };
+  const stream = {
+    async waitForReady() { return true; },
+    async begin(payload) {
+      begins.push(payload.part.index);
+      currentPart = payload.part.index;
+      return {
+        type: 'docdown-print-begun',
+        partIndex: payload.part.index,
+        baseline: {
+          heap: 100 * MB,
+          heapLimit: 4 * 1024 * MB,
+          nodes: 100,
+          imageBytes: 0
+        }
+      };
+    },
+    async append(payload) {
+      const count = payload.toPage - payload.fromPage + 1;
+      appends.push([currentPart, payload.fromPage, payload.toPage]);
+      return {
+        type: 'docdown-print-appended',
+        fromPage: payload.fromPage,
+        toPage: payload.toPage,
+        pages: count,
+        heap: 100 * MB + count * 64 * KB,
+        heapLimit: 4 * 1024 * MB,
+        nodes: 100 + count * 900,
+        imageBytes: 0,
+        markupBytes: count * 60 * KB
+      };
+    },
+    async finalize(payload) {
+      finals.push(payload);
+      return { type: 'docdown-print-finalized' };
+    },
+    close() {}
+  };
+
+  DD.ui = {
+    openPrintWindow: () => win,
+    createPrintStream: (target, callbacks) => {
+      handlers = callbacks;
+      return stream;
+    },
+    setState() {},
+    progress() {},
+    progressText() {},
+    toast(message, type, options) { toasts.push({ message, type, options }); },
+    showPrintError() {},
+    cleanup() {},
+    mount() {}
+  };
+
+  await provider.run();
+  assert.deepEqual(begins, [1]);
+  assert.deepEqual(finals[0] && [finals[0].fromPage, finals[0].toPage], [1, 256]);
+  assert.equal(finals[0].hasPrev, false);
+  assert.equal(finals[0].hasNext, true);
+
+  handlers.onNext();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.deepEqual(begins, [1, 2]);
+  assert.deepEqual(finals[1] && [finals[1].fromPage, finals[1].toPage], [257, 510]);
+  assert.equal(finals[1].hasPrev, true);
+  assert.equal(finals[1].hasNext, false);
+  assert.match(finals[1].fileName, /phần 2 \(trang 257–510\)/);
+  assert.equal(toasts.length, 1);
+  assert.equal(toasts[0].options.duration, 10000,
+    'the final instruction must auto-hide after 10 seconds');
+
+  handlers.onPrev();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.deepEqual(begins, [1, 2, 1], 'previous replays part 1');
+  assert.deepEqual(
+    [finals[2].fromPage, finals[2].toPage],
+    [1, 256],
+    'the replay keeps the original part range'
+  );
+
+  handlers.onNext();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.deepEqual(begins, [1, 2, 1, 2],
+    'next replays the stored part 2 instead of creating part 3');
+  assert.deepEqual([finals[3].fromPage, finals[3].toPage], [257, 510]);
+
+  function covered(part) {
+    return appends
+      .filter((entry) => entry[0] === part)
+      .map((entry) => entry[1] + '-' + entry[2])
+      .join(' ');
+  }
+
+  assert.match(covered(1), /^1-16 /, 'the probe opens part 1');
+  assert.match(covered(1), / 1-24 /, 'replaying part 1 starts again at page 1');
+  assert.match(covered(1), /241-256$/);
+  assert.match(covered(2), /^257-280 /);
+  assert.match(covered(2), /497-510$/);
+
+  // Closing the tab while viewing a part stores its exact range. The next
+  // Tải PDF must replay that part, not create a new one.
+  win.closed = true;
+  handlers.onPrev();
+  win.closed = false;
+  await provider.run();
+  assert.deepEqual(begins, [1, 2, 1, 2, 1],
+    'reopening after a closed tab replays part 1');
+  assert.deepEqual([finals[4].fromPage, finals[4].toPage], [1, 256]);
+});
+
 test('preparePage reports positive markup, CSS, node and image metrics', () => {
   const root = buildPageFixture();
   const pageUrl = ASSET_BASE + '/3240049/1.html';

@@ -167,6 +167,11 @@
   background: #991b1b;
 }
 
+#docdown-toast.docdown-toast-success {
+  background: #14532d;
+  border: 1px solid #22c55e;
+}
+
 #docdown-toast.docdown-toast-hide {
   opacity: 0;
   transform: translate(-50%, 8px);

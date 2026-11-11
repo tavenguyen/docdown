@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "DocDown",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Chrome extension that downloads TaiLieu.VN PDFs and rebuilds Studocu, Scribd, SlideShare, Course Hero and Academia.edu documents into print-ready PDFs from the pages the site already sends.",
   "author": "DocDown",
   "icons": {

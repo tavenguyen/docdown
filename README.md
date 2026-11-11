@@ -16,8 +16,8 @@ pages and downloads the file in one click.
   the rest as locked, and marks any redacted area inside a page as partly
   unreadable.
 - **Academia.edu** — rebuilds the document from the page HTML the viewer
-  downloads in memory-adaptive parts, then opens the print-ready tab for each
-  part.
+  downloads in memory-adaptive parts, using one reused print-ready tab for each
+  part with **Phần trước** / **Phần tiếp theo** navigation and a local merge.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -117,7 +117,10 @@ backgrounds and DocDown prints the full document with no hatch and no note.
 5. Click **Phần tiếp theo** in the same print tab to replace it with part 2,
    then save it the same way, for example
    `Tài liệu - phần 2 (trang 257–510).pdf`.
-6. On the last part, click **Ghép PDF**. In the merge page, select the part
+6. Use **Phần trước** if you need to go back. DocDown rebuilds that stored page
+   range from Academia with the same part number and file name, so you can
+   print it again. It does not keep a second part in memory.
+7. On the last part, click **Ghép PDF**. In the merge page, select the part
    PDFs you saved. DocDown checks the total page count and merges them locally
    into one PDF; nothing is uploaded.
 
@@ -139,11 +142,14 @@ Only one print tab is reused and only the current part is built in it; DocDown
 does not keep every part in memory at once.
 
 If the print tab is closed mid-part, click **Tải PDF** again. DocDown resumes
-from the first page of the unfinished part; parts you already saved are not
-rebuilt. Saving each part is a manual step in Chrome's print dialog—DocDown
-does not capture the dialog automatically. Merging is also manual: select the
-saved part PDFs on the merge page. `MAX_DOCUMENT_PAGES` 2000 is only a safety
-guard against corrupt metadata, not a page limit.
+from the first page of the unfinished part, or reopens the part you were
+reviewing; parts you already saved are not redone. Saving each part is a manual
+step in Chrome's print dialog—DocDown does not capture the dialog
+automatically. After the last part, the instruction toast disappears after
+about 10 seconds; the **Ghép PDF** button stays in the print tab. Merging is
+also manual: select the saved part PDFs on the merge page.
+`MAX_DOCUMENT_PAGES` 2000 is only a safety guard against corrupt metadata, not
+a page limit.
 
 ### Reset phiên
 
@@ -190,9 +196,10 @@ server never sends their content to non-subscribers.
   selecting the saved part PDFs yourself on the merge page; the merged PDF is
   produced locally and nothing is uploaded. Very large or heavy documents can
   still fail in Chrome and are retried with smaller parts, so this is not a
-  guarantee of unlimited RAM. The merge page accepts up to 20 saved part PDFs in
-  one pass, so a document split into more parts cannot be merged into a single
-  PDF there.
+  guarantee of unlimited RAM. The merge page accepts up to 64 saved part PDFs
+  in one pass, which covers the maximum 63 parts of a 2000-page document split
+  at the 32-page minimum. Per-file (256 MB) and total (1 GB) byte caps still
+  apply.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 
@@ -209,7 +216,10 @@ server never sends their content to non-subscribers.
   (~513 KiB), an explicitly approved exception to the 100 KB bundle guideline;
   it is never fetched at runtime, is not loaded by the other pages, the
   background worker, or the content scripts, and adds no manifest permission.
-- Third-party agent skills: [`THIRD_PARTY_SKILLS.md`](THIRD_PARTY_SKILLS.md).
+- Third-party agent skills: [`THIRD_PARTY_SKILLS.md`](THIRD_PARTY_SKILLS.md),
+  including `ui-ux-pro-max` (MIT, dev-only Python/CSV search data) and the
+  `linear.app` DESIGN.md from `VoltAgent/awesome-design-md` (MIT) used as a
+  reference for [`DESIGN.md`](DESIGN.md).
 
 ## Disclaimer
 

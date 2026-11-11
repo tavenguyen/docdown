@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const MAX_FILES = 20;
+  const MAX_FILES = 64;
   const MAX_FILE_BYTES = 256 * 1024 * 1024;
   const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
   const LARGE_TOTAL_BYTES = 300 * 1024 * 1024;
@@ -411,11 +411,21 @@
 
     const documentTitleEl = document.getElementById('document-title');
     const expectedTotalEl = document.getElementById('expected-total');
+    const selectedTotalEl = document.getElementById('selected-total');
+    const pageDeltaEl = document.getElementById('page-delta');
     const fileListEl = document.getElementById('file-list');
     const fileSummaryEl = document.getElementById('file-summary');
     const emptyListEl = document.getElementById('empty-list');
     const warningsEl = document.getElementById('merge-warnings');
     const skipCheckEl = document.getElementById('skip-page-check');
+    const dropzoneEl = document.getElementById('dropzone');
+    const resetButton = document.getElementById('reset-files');
+    const pickerStateEl = document.getElementById('picker-state');
+    const statusBoxEl = document.getElementById('status-box');
+    const mergeLabel = mergeButton.querySelector('.btn-label') || mergeButton;
+    const steps = typeof document.querySelectorAll === 'function'
+      ? Array.prototype.slice.call(document.querySelectorAll('.step'))
+      : [];
 
     const state = {
       title: '',
@@ -427,10 +437,15 @@
       generation: 0
     };
 
+    function setStep(step) {
+      steps.forEach(function (element, index) {
+        element.classList.toggle('is-active', index === step - 1);
+      });
+    }
+
     function setStatus(message, tone) {
       statusEl.textContent = message || '';
-      if (tone) statusEl.setAttribute('data-tone', tone);
-      else statusEl.removeAttribute('data-tone');
+      if (statusBoxEl) statusBoxEl.setAttribute('data-tone', tone || 'info');
     }
 
     function setDocumentInfo() {
@@ -441,6 +456,34 @@
         expectedTotalEl.textContent = state.expectedTotal > 0
           ? state.expectedTotal + ' trang'
           : 'Không rõ';
+      }
+    }
+
+    function updateSummary() {
+      const pages = totalPagesOf(state.entries);
+      if (selectedTotalEl) selectedTotalEl.textContent = pages + ' trang';
+      if (pageDeltaEl) {
+        if (state.expectedTotal > 0 && state.entries.length) {
+          const delta = pages - state.expectedTotal;
+          pageDeltaEl.textContent = delta === 0
+            ? 'Khớp'
+            : (delta > 0 ? '+' : '') + delta + ' trang';
+          pageDeltaEl.style.color = delta === 0
+            ? 'var(--success)'
+            : (delta > 0 ? 'var(--warning)' : 'var(--danger)');
+        } else {
+          pageDeltaEl.textContent = '—';
+          pageDeltaEl.style.color = '';
+        }
+      }
+      if (pickerStateEl) {
+        pickerStateEl.textContent = state.busy
+          ? 'Đang xử lý'
+          : (state.merged ? 'Đã ghép' : (state.entries.length ? state.entries.length + ' file' : 'Chưa chọn'));
+      }
+      if (resetButton) {
+        resetButton.hidden = state.entries.length === 0 && !state.merged;
+        resetButton.disabled = state.busy;
       }
     }
 
@@ -470,10 +513,20 @@
         meta.textContent = (pageCount > 0 ? pageCount + ' trang' : 'Không rõ số trang') +
           ' · ' + formatBytes(entryBytes(entry));
 
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'icon-button';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', 'Xoá ' + entryName(entry, index));
+        remove.addEventListener('click', function () {
+          removeEntry(index);
+        });
+
         body.appendChild(name);
         body.appendChild(meta);
         item.appendChild(badge);
         item.appendChild(body);
+        item.appendChild(remove);
         fileListEl.appendChild(item);
       });
 
@@ -483,6 +536,7 @@
         ? state.entries.length + ' file · ' + totalPagesOf(state.entries) +
           ' trang · ' + formatBytes(totalBytesOf(state.entries))
         : '';
+      updateSummary();
     }
 
     function updateWarnings() {
@@ -524,6 +578,7 @@
     }
 
     function refreshValidation() {
+      updateSummary();
       if (!state.pdfReady || !state.entries.length) {
         mergeButton.disabled = true;
         return false;
@@ -553,7 +608,37 @@
       });
     }
 
-    async function onFilesSelected() {
+    function resetSelection() {
+      if (state.busy) return;
+      state.generation += 1;
+      releaseEntries();
+      state.entries = [];
+      state.merged = false;
+      input.value = '';
+      renderList();
+      updateWarnings();
+      setStatus('Chọn file PDF để bắt đầu.', 'info');
+      mergeButton.disabled = true;
+      setStep(1);
+    }
+
+    function removeEntry(index) {
+      if (state.busy || state.merged) return;
+      const removed = state.entries.splice(index, 1)[0];
+      if (removed) removed.buffer = null;
+      renderList();
+      updateWarnings();
+      if (!state.entries.length) {
+        setStatus('Chọn file PDF để bắt đầu.', 'info');
+        mergeButton.disabled = true;
+        setStep(1);
+        return;
+      }
+      refreshValidation();
+      setStep(2);
+    }
+
+    async function handleFiles(selectedFiles) {
       if (state.busy) return;
 
       const token = state.generation + 1;
@@ -565,9 +650,12 @@
       updateWarnings();
       mergeButton.disabled = true;
 
-      const files = input.files ? Array.prototype.slice.call(input.files) : [];
+      const files = selectedFiles
+        ? Array.prototype.slice.call(selectedFiles)
+        : [];
       if (!files.length) {
-        setStatus('Chọn file PDF để bắt đầu.');
+        setStatus('Chọn file PDF để bắt đầu.', 'info');
+        setStep(1);
         return;
       }
       if (files.length > MAX_FILES) {
@@ -594,6 +682,8 @@
         return;
       }
 
+      state.busy = true;
+      updateSummary();
       setStatus('Đang đọc ' + files.length + ' file PDF…', 'info');
       try {
         const read = await readFileEntries(files);
@@ -605,6 +695,7 @@
         renderList();
         updateWarnings();
         refreshValidation();
+        setStep(2);
       } catch (error) {
         if (token !== state.generation) return;
         state.entries = [];
@@ -617,6 +708,17 @@
           'error'
         );
         warn(error);
+      } finally {
+        state.busy = false;
+        updateSummary();
+        if (state.pdfReady) {
+          const after = validateEntries(
+            state.entries,
+            state.expectedTotal,
+            !!(skipCheckEl && skipCheckEl.checked)
+          );
+          mergeButton.disabled = !after.ok || state.merged;
+        }
       }
     }
 
@@ -648,8 +750,9 @@
       const pageTotal = totalPagesOf(selected);
 
       state.busy = true;
+      updateSummary();
       mergeButton.disabled = true;
-      mergeButton.textContent = 'Đang ghép…';
+      mergeLabel.textContent = 'Đang ghép…';
       input.disabled = true;
       if (skipCheckEl) skipCheckEl.disabled = true;
       setStatus('Đang ghép ' + selected.length + ' file PDF…', 'info');
@@ -670,6 +773,7 @@
         state.merged = true;
         releaseEntries();
         setStatus('Đã ghép ' + pageTotal + ' trang', 'success');
+        setStep(3);
       } catch (error) {
         setStatus(
           error && error.docdown
@@ -680,9 +784,10 @@
         warn(error);
       } finally {
         state.busy = false;
-        mergeButton.textContent = 'Ghép PDF';
+        mergeLabel.textContent = 'Ghép PDF';
         input.disabled = false;
         if (skipCheckEl) skipCheckEl.disabled = false;
+        updateSummary();
 
         if (state.merged) {
           mergeButton.disabled = true;
@@ -713,6 +818,7 @@
         : 0;
     }
     setDocumentInfo();
+    updateSummary();
 
     const library = pdfLibrary();
     state.pdfReady = !!(library && library.PDFDocument &&
@@ -725,9 +831,37 @@
       return;
     }
 
-    input.addEventListener('change', onFilesSelected);
+    input.addEventListener('change', function () {
+      handleFiles(input.files);
+    });
     mergeButton.addEventListener('click', onMergeClicked);
     if (skipCheckEl) skipCheckEl.addEventListener('change', onSkipChanged);
+    if (resetButton) resetButton.addEventListener('click', resetSelection);
+
+    if (dropzoneEl) {
+      ['dragenter', 'dragover'].forEach(function (type) {
+        dropzoneEl.addEventListener(type, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          dropzoneEl.classList.add('is-dragging');
+        });
+      });
+      ['dragleave', 'dragend'].forEach(function (type) {
+        dropzoneEl.addEventListener(type, function (event) {
+          event.preventDefault();
+          dropzoneEl.classList.remove('is-dragging');
+        });
+      });
+      dropzoneEl.addEventListener('drop', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzoneEl.classList.remove('is-dragging');
+        const dropped = event.dataTransfer && event.dataTransfer.files;
+        if (dropped && dropped.length) handleFiles(dropped);
+        else setStatus('Không đọc được file vừa thả. Hãy chọn lại.', 'error');
+      });
+    }
+
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('pagehide', releaseEntries);
     }

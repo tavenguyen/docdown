@@ -143,7 +143,7 @@ test('validateEntries enforces count, size, page and expected-total limits', () 
   assert.equal(merge.validateEntries([], 0, false).reason, 'empty');
   assert.equal(merge.validateEntries([entry('one', 1)], 1, false).ok, true);
 
-  const tooMany = Array.from({ length: 21 }, (_, index) =>
+  const tooMany = Array.from({ length: 65 }, (_, index) =>
     entry('part ' + (index + 1), 1, 1));
   assert.equal(merge.validateEntries(tooMany, 0, false).reason, 'too-many');
 
@@ -315,6 +315,23 @@ test('formatBytes formats byte, kilobyte, megabyte and gigabyte sizes', () => {
   for (const [value, expected] of cases) {
     assert.equal(merge.formatBytes(value), expected, String(value));
   }
+});
+
+test('validateEntries accepts the full 64-part Academia maximum', () => {
+  const entries = Array.from({ length: 64 }, (_, index) =>
+    entry('part ' + (index + 1), 1, 1));
+  assert.equal(merge.validateEntries(entries, 64, false).ok, true);
+});
+
+test('merge.html exposes the dark developer picker and summary hooks', () => {
+  assert.match(mergeHtml, /id="dropzone"/);
+  assert.match(mergeHtml, /id="selected-total"/);
+  assert.match(mergeHtml, /id="page-delta"/);
+  assert.match(mergeHtml, /id="reset-files"/);
+  assert.match(mergeHtml, /id="status-box"/);
+  assert.equal(/fonts\.googleapis|fonts\.gstatic|@import/i.test(mergeHtml), false,
+    'the extension must not fetch web fonts');
+  assert.equal(/style\s*=\s*["'][^"']*url\(/i.test(mergeHtml), false);
 });
 
 test('merge.html loads core, pdf-lib and merge.js in order without inline code', () => {
