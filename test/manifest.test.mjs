@@ -60,6 +60,30 @@ test('background, print page and icons exist', () => {
   for (const file of Object.values(manifest.icons || {})) assertFileExists(file);
 });
 
+test('every provider module on disk is loaded by the print page and the service worker', () => {
+  const shipped = fs.readdirSync(path.join(root, 'providers'))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => 'providers/' + name)
+    .sort();
+
+  const printHtml = fs.readFileSync(path.join(root, 'print.html'), 'utf8');
+  const printScripts = new Set(
+    Array.from(printHtml.matchAll(/<script[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi), (match) => match[1])
+  );
+
+  const backgroundSource = fs.readFileSync(path.join(root, 'background.js'), 'utf8');
+  const importCall = backgroundSource.match(/importScripts\(([^)]*)\)/);
+  assert.ok(importCall, 'background.js must call importScripts');
+  const imported = new Set(
+    (importCall[1].match(/["']([^"']+)["']/g) || []).map((value) => value.slice(1, -1))
+  );
+
+  for (const file of shipped) {
+    assert.ok(printScripts.has(file), 'provider not loaded by print.html: ' + file);
+    assert.ok(imported.has(file), 'provider not imported by background.js: ' + file);
+  }
+});
+
 test('every provider module on disk is loaded by the content script', () => {
   const shipped = fs.readdirSync(path.join(root, 'providers'))
     .filter((name) => name.endsWith('.js'))

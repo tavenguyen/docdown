@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js', '../providers/scribd.js', '../providers/slideshare.js', '../providers/coursehero.js']
+const APP_SOURCES = ['../lib/core.js', '../lib/registry.js', '../providers/studocu.js', '../providers/tailieu.js', '../providers/scribd.js', '../providers/slideshare.js', '../providers/coursehero.js', '../providers/academia.js']
   .map((path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8'));
 const backgroundSource = fs.readFileSync(new URL('../background.js', import.meta.url), 'utf8');
 
@@ -137,12 +137,47 @@ test('reset message removes cookies and browsing data for the sender tab', async
     'https://cdn.tailieu.vn',
     'https://html.scribdassets.com',
     'https://image.slidesharecdn.com',
-    'https://www.coursehero.com'
+    'https://www.coursehero.com',
+    'https://attachments.academia-assets.com'
   ]);
   assert.equal(assets.data.cache, true);
   assert.equal(assets.data.serviceWorkers, true);
   assert.equal(assets.data.cookies, undefined,
     'browsingData treats cookies per site, so asset origins must not wipe studocu.com cookies');
+});
+
+test('reset message accepts Academia.edu and keeps asset origins out of the site wipe', async () => {
+  const { calls, send } = loadBackground({
+    cookiesByStore: {
+      '0': [
+        { name: 'academia_session', domain: '.academia.edu', path: '/', secure: true, httpOnly: true },
+        { name: 'theme', domain: 'www.academia.edu', path: '/', secure: true, httpOnly: false }
+      ]
+    }
+  });
+
+  const result = await send(
+    { type: 'docdown-reset', hostname: 'www.academia.edu' },
+    { id: 'extension-id', tab: { id: 1, url: 'https://www.academia.edu/42289459/x' } }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cookies, 2, 'both Academia cookies of the sender store are removed');
+  assert.deepEqual(calls.removed.map((d) => d.name).sort(), ['academia_session', 'theme']);
+
+  assert.equal(calls.browsingData.length, 2);
+  const site = calls.browsingData[0];
+  assert.ok(site.spec.origins.includes('https://www.academia.edu'));
+  assert.ok(site.spec.origins.includes('https://academia.edu'));
+  assert.equal(
+    site.spec.origins.includes('https://attachments.academia-assets.com'),
+    false,
+    'asset origins must stay out of the site cookie wipe'
+  );
+
+  const assets = calls.browsingData[1];
+  assert.ok(assets.spec.origins.includes('https://attachments.academia-assets.com'));
+  assert.equal(assets.data.cookies, undefined, 'asset origins never wipe cookies');
 });
 
 test('reset message is rejected for unsupported hosts', async () => {

@@ -427,6 +427,11 @@ test('buildFileName strips the newer site suffixes', () => {
   assert.equal(SH.buildFileName('Thiết bị | SlideShare'), 'Thiết bị');
 });
 
+test('buildFileName strips the Academia site suffix', () => {
+  assert.equal(SH.buildFileName('Hands-on ML | Academia.edu'), 'Hands-on ML');
+  assert.equal(SH.buildFileName('Hands-on ML - Academia'), 'Hands-on ML');
+});
+
 test('countPdfPages reads plain and compressed page trees', async () => {
   const plain = new TextEncoder().encode('%PDF-1.6\n1 0 obj << /Type /Pages /Count 53 >> endobj');
   assert.equal(await SH.countPdfPages(plain), 53);

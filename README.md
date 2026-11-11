@@ -15,6 +15,8 @@ pages and downloads the file in one click.
 - **Course Hero** — rebuilds the pages the viewer renders for your account, marks
   the rest as locked, and marks any redacted area inside a page as partly
   unreadable.
+- **Academia.edu** — rebuilds the document from the page HTML the viewer
+  downloads, then opens the print-ready tab.
 - **Reset phiên** — clears cookies (including `HttpOnly`), storage, cache and
   service workers, then reloads the page. It signs you out.
 
@@ -102,6 +104,19 @@ invents the pages or the pixels the site did not send.
 When your account can view every page, the viewer renders them with clear
 backgrounds and DocDown prints the full document with no hatch and no note.
 
+### Academia.edu
+
+1. Open a work page on `academia.edu` and wait for the viewer.
+2. Click **Tải PDF** at the bottom-right.
+3. Check the preview, then click **Print / Save as PDF**.
+
+Academia.edu sends each page of a work as HTML plus the fonts that page uses,
+all from `attachments.academia-assets.com`. DocDown rebuilds the text and the
+fonts from those pages, so the preview keeps the document's own layout. It never
+embeds the blurred or gated preview the site shows to visitors without access: a
+page Academia does not send is printed as a white page with a note. Documents
+over 300 pages are capped so the tab does not run out of memory.
+
 ### Reset phiên
 
 Click the grey **Reset phiên** button above the green one, then click again
@@ -123,6 +138,7 @@ server never sends their content to non-subscribers.
 | `scribd.com` | rebuild from the viewer's page layers + print preview |
 | `slideshare.net` | slide images from `image.slidesharecdn.com` + print preview |
 | `coursehero.com` | preview pages rendered in the viewer; redacted areas marked |
+| `academia.edu` | rebuild from the viewer's page HTML + print preview |
 
 ## Limits
 
@@ -138,6 +154,9 @@ server never sends their content to non-subscribers.
   redacted area is printed as a hatched block, never as a blurred image, and a
   page that mixes readable text with redacted artwork is labelled as partly
   readable rather than silently printed as if it were complete.
+- Academia.edu is rebuilt from the pages its viewer already downloads; pages the
+  site does not send, or only shows as a preview, are printed as white note pages
+  instead of being fabricated.
 - Studocu documents over 300 pages are capped so the tab does not run out of
   memory.
 
@@ -151,8 +170,8 @@ server never sends their content to non-subscribers.
 
 ## Disclaimer
 
-- Not affiliated with, endorsed by, or sponsored by Studocu, Studeersnel or
-  TaiLieu.VN.
+- Not affiliated with, endorsed by, or sponsored by Studocu, Studeersnel,
+  TaiLieu.VN or Academia.edu.
 - Downloading documents may violate a site's Terms of Service or copyright law.
   Use it only for material you have the right to access, for personal study.
 - Locked pages are never fabricated and blurred previews are never embedded;

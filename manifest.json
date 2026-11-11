@@ -2,8 +2,8 @@
   "manifest_version": 3,
 
   "name": "DocDown",
-  "version": "2.5.0",
-  "description": "Chrome extension that downloads TaiLieu.VN PDFs and rebuilds Studocu, Scribd, SlideShare and Course Hero documents into print-ready PDFs from the pages the site already sends.",
+  "version": "2.6.0",
+  "description": "Chrome extension that downloads TaiLieu.VN PDFs and rebuilds Studocu, Scribd, SlideShare, Course Hero and Academia.edu documents into print-ready PDFs from the pages the site already sends.",
   "author": "DocDown",
   "icons": {
     "128": "img/icon.png"
@@ -21,7 +21,9 @@
     "https://*.scribdassets.com/*",
     "https://*.slideshare.net/*",
     "https://*.slidesharecdn.com/*",
-    "https://*.coursehero.com/*"
+    "https://*.coursehero.com/*",
+    "https://*.academia.edu/*",
+    "https://attachments.academia-assets.com/*"
   ],
 
   "background": {
@@ -39,7 +41,8 @@
         "https://tailieu.vn/*",
         "https://www.scribd.com/*",
         "https://www.slideshare.net/*",
-        "https://www.coursehero.com/*"
+        "https://www.coursehero.com/*",
+        "https://www.academia.edu/*"
       ]
     }
   ],
@@ -54,7 +57,8 @@
         "https://tailieu.vn/doc/*",
         "https://www.scribd.com/document/*",
         "https://www.slideshare.net/slideshow/*",
-        "https://www.coursehero.com/file/*"
+        "https://www.coursehero.com/file/*",
+        "https://www.academia.edu/*"
       ],
       "js": [
         "lib/core.js",
@@ -66,6 +70,7 @@
         "providers/scribd.js",
         "providers/slideshare.js",
         "providers/coursehero.js",
+        "providers/academia.js",
         "content/ui.js",
         "content/main.js"
       ],

@@ -26,7 +26,7 @@ Run these before reporting completion:
 
 ```powershell
 Get-ChildItem lib\*.js, providers\*.js, content\*.js, background.js, print.js | ForEach-Object { node --check $_.FullName }
-node --test test/core.test.mjs test/tailieu.test.mjs test/scribd.test.mjs test/slideshare.test.mjs test/coursehero.test.mjs test/manifest.test.mjs test/background.test.mjs test/print.test.mjs
+node --test test/core.test.mjs test/tailieu.test.mjs test/scribd.test.mjs test/slideshare.test.mjs test/coursehero.test.mjs test/academia.test.mjs test/manifest.test.mjs test/background.test.mjs test/print.test.mjs
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 ```
 
@@ -39,7 +39,10 @@ For the browser path, load the unpacked extension and test:
   a 375 px viewport;
 - a SlideShare presentation, including a 375 px viewport;
 - a Course Hero file, confirming the preview note and that no blurred image is
-  embedded, including a 375 px viewport.
+  embedded, including a 375 px viewport;
+- an Academia.edu work page, confirming the viewer pages render as text and
+  fonts (not screenshots), missing pages become white note pages, and the
+  375 px viewport still saves a PDF.
 
 ## Architecture
 
@@ -58,7 +61,8 @@ For the browser path, load the unpacked extension and test:
   without them.
 - Approved permissions: `cookies` and `browsingData`, plus `host_permissions`
   for the four Studocu domains, `tailieu.vn`, `scribd.com`, `scribdassets.com`,
-  `slideshare.net`, `slidesharecdn.com` and `coursehero.com`. They exist for the
+  `slideshare.net`, `slidesharecdn.com`, `coursehero.com`, `academia.edu` and
+  `attachments.academia-assets.com`. They exist for the
   Reset phiên flow (removing `HttpOnly` cookies, HTTP cache, and service
   workers) and for site detection. Ask before adding more.
 - Only fetch from:
@@ -70,7 +74,11 @@ For the browser path, load the unpacked extension and test:
   - Course Hero pages are read from the rendered DOM; only clear
     `https://www.coursehero.com/asset/bg/<hash>/…` artwork may be embedded, never
     a `/blur/` path. Do not strip CSS blur classes or filters: a page counts as
-    readable only when the server already sent the clear content.
+    readable only when the server already sent the clear content;
+  - Academia.edu page HTML, images and fonts from
+    `https://attachments.academia-assets.com/<attachmentId>/` only. Page CSS is
+    extracted, sanitised, and injected once into the print document; it is never
+    kept inside the fetched fragment.
 - Validate every fetched URL: HTTPS, allowlisted host, no path traversal, and
   the expected file type before saving.
 - Sanitize fetched page HTML: remove `script`, `iframe`, `object`, `embed`,
